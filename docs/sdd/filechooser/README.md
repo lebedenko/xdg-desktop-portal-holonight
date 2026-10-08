@@ -2,6 +2,10 @@
 
 Status: Accepted
 
+Implementation: local automated acceptance passed. Native review reported multiple issues;
+the user requested that they be addressed individually after this implementation checkpoint.
+Native acceptance remains open; no publication or ecosystem acceptance is implied.
+
 ## Requirements
 
 FC-001: Implement backend OpenFile, SaveFile, SaveFiles and Request.Close with exact

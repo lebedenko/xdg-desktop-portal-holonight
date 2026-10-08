@@ -1,0 +1,53 @@
+cmake_minimum_required(VERSION 3.25)
+project(xdg-desktop-portal-holonight VERSION 0.1.0 LANGUAGES C CXX)
+include(GNUInstallDirs)
+set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+find_package(Qt6 6.11 REQUIRED COMPONENTS Core Gui GuiPrivate Quick Qml QuickControls2 DBus Concurrent)
+qt_standard_project_setup(REQUIRES 6.11)
+find_package(HolonightFileBrowser CONFIG REQUIRED COMPONENTS Core Quick)
+find_package(HolonightSearch CONFIG REQUIRED)
+find_package(HolonightQt CONFIG REQUIRED)
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(WaylandClient REQUIRED IMPORTED_TARGET wayland-client)
+pkg_get_variable(protocols_dir wayland-protocols pkgdatadir)
+find_program(WAYLAND_SCANNER wayland-scanner REQUIRED)
+set(protocol_xml "${protocols_dir}/unstable/xdg-foreign/xdg-foreign-unstable-v2.xml")
+add_custom_command(OUTPUT xdg-foreign-client.h
+  COMMAND ${WAYLAND_SCANNER} client-header ${protocol_xml} xdg-foreign-client.h DEPENDS ${protocol_xml})
+add_custom_command(OUTPUT xdg-foreign.c
+  COMMAND ${WAYLAND_SCANNER} private-code ${protocol_xml} xdg-foreign.c DEPENDS ${protocol_xml})
+add_library(portal-wayland STATIC src/wayland_parent.cpp xdg-foreign.c xdg-foreign-client.h)
+target_include_directories(portal-wayland PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
+target_link_libraries(portal-wayland PRIVATE Qt6::GuiPrivate PkgConfig::WaylandClient)
+qt_add_library(portal-core STATIC)
+qt_add_qml_module(portal-core URI HolonightPortal.Private VERSION 1.0 NO_PLUGIN
+  OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/qml/HolonightPortal/Private
+  SOURCES src/wire.cpp src/filesystem.cpp src/controller.cpp src/controller.h src/backend.cpp)
+target_include_directories(portal-core PUBLIC src)
+target_link_libraries(portal-core PUBLIC Qt6::DBus Qt6::Concurrent HolonightFileBrowser::Core HolonightSearch::Search)
+add_library(portal-presentation STATIC src/presenter.cpp)
+target_link_libraries(portal-presentation PUBLIC portal-core Qt6::Quick HolonightFileBrowser::Quick
+  PRIVATE portal-wayland HolonightQt::Core HolonightQt::Controls)
+foreach(target portal-core portal-wayland portal-presentation)
+  target_compile_options(${target} PRIVATE -Wall -Wextra -Wpedantic)
+endforeach()
+qt_add_executable(xdg-desktop-portal-holonight src/main.cpp)
+set_source_files_properties(qml/Chooser.qml PROPERTIES QT_RESOURCE_ALIAS Chooser.qml)
+qt_add_qml_module(xdg-desktop-portal-holonight URI HolonightPortal VERSION 1.0
+  RESOURCE_PREFIX /qt/qml IMPORT_PATH ${CMAKE_CURRENT_BINARY_DIR}/qml ${QML_IMPORT_PATH}
+  QML_FILES qml/Chooser.qml NO_IMPORT_SCAN)
+target_link_libraries(xdg-desktop-portal-holonight PRIVATE portal-presentation Qt6::QuickControls2)
+target_compile_options(xdg-desktop-portal-holonight PRIVATE -Wall -Wextra -Wpedantic)
+install(TARGETS xdg-desktop-portal-holonight RUNTIME DESTINATION ${CMAKE_INSTALL_LIBEXECDIR})
+configure_file(packaging/org.freedesktop.impl.portal.desktop.holonight_filechooser.service.in
+  org.freedesktop.impl.portal.desktop.holonight_filechooser.service @ONLY)
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/org.freedesktop.impl.portal.desktop.holonight_filechooser.service
+  DESTINATION ${CMAKE_INSTALL_DATADIR}/dbus-1/services)
+install(FILES packaging/holonight-filechooser.portal DESTINATION ${CMAKE_INSTALL_DATADIR}/xdg-desktop-portal/portals)
+install(FILES LICENSE LICENSES/GPL-3.0-or-later.txt DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/${PROJECT_NAME})
+include(CTest)
+if(BUILD_TESTING)
+  add_subdirectory(tests)
+endif()
