@@ -4,10 +4,15 @@
 #include <QQmlEngine>
 #include <QWindow>
 
+#include <functional>
+
 namespace Portal {
+class WaylandParent;
 class QmlPresenter : public Presenter {
  public:
   explicit QmlPresenter(QObject* parent = nullptr);
+  using ParentFactory = std::function<WaylandParent*(QWindow*, const QString&)>;
+  explicit QmlPresenter(ParentFactory factory, QObject* parent = nullptr);
   ~QmlPresenter() override;
   QmlPresenter(const QmlPresenter&) = delete;
   QmlPresenter& operator=(const QmlPresenter&) = delete;
@@ -17,6 +22,7 @@ class QmlPresenter : public Presenter {
   void close(Controller* controller) override;
 
  private:
+  ParentFactory parent_factory_;
   QQmlEngine engine_;
   QHash<Controller*, QWindow*> windows_;
 };

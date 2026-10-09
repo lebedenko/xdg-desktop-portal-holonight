@@ -12,7 +12,11 @@
 void qml_register_types_HolonightPortal_Private();
 
 namespace Portal {
-QmlPresenter::QmlPresenter(QObject* parent) : Presenter(parent) {
+QmlPresenter::QmlPresenter(QObject* parent)
+    : QmlPresenter([](QWindow* window, const QString& handle) { return new WaylandParent(window, handle, window); },
+                   parent) {}
+QmlPresenter::QmlPresenter(ParentFactory factory, QObject* parent)
+    : Presenter(parent), parent_factory_(std::move(factory)) {
   static const bool registered = [] {
     qml_register_types_HolonightPortal_Private();
     return true;
@@ -33,12 +37,14 @@ bool QmlPresenter::show(Controller* controller, const Options& options) {
   window->setModality(options.modal ? Qt::WindowModal : Qt::NonModal);
   windows_.insert(controller, window);
   window->create();
-  new WaylandParent(window, options.parent, window);
-  window->show();
+  auto* adapter = parent_factory_(window, options.parent);
+  connect(adapter, &WaylandParent::prepared, window, &QWindow::show);
+  adapter->prepare();
   return true;
 }
 void QmlPresenter::close(Controller* controller) {
   if (auto* window = windows_.take(controller)) {
+    qDeleteAll(window->findChildren<WaylandParent*>(QString{}, Qt::FindDirectChildrenOnly));
     window->hide();
     window->deleteLater();
   }

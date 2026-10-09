@@ -240,3 +240,72 @@ broader compositor matrix, real-broker/document-access or umbrella integration
 acceptance. No publication, commit or umbrella pin/status change was performed.
 This closure edits only SDD documentation; git diff --check passed. Existing build,
 test and quality-check evidence is unchanged and was not rerun.
+
+
+## Parenting before initial placement — 2026-10-09 (FC-T10)
+
+Baseline: af1e9a4806f1b74aaffe392588c81a76d1275b2f, initially clean.
+The previous adapter showed immediately, then discovered/imported the parent on
+its dispatch timer. The updated presenter connects preparation completion before
+starting it, and keeps the chooser hidden until completion. The adapter uses two
+private-queue wl_display_sync callbacks: registry discovery, then import validation.
+Qt retains ownership of display reads; there are no blocking roundtrips or nested
+interaction loops. A direct surfaceRoleCreated connection applies set_parent_of
+synchronously before Qt's initial shell-role commit. Preparation is bounded to
+one second, with ordinary presentation on unavailable/invalid parents or timeout.
+Close destroys the adapter immediately before deferred window deletion, cancelling
+callbacks, dispatch and the deadline. Late completion cannot show or parent a
+cancelled/timed-out request. Parent invalidation after presentation retains the
+protocol's ordinary unparented behavior.
+
+The placement ordering follows [Qt's initWindow implementation](https://raw.githubusercontent.com/qt/qtbase/6.11/src/plugins/platforms/wayland/qwaylandwindow.cpp)
+and the [xdg-foreign-v2 protocol](https://raw.githubusercontent.com/wayland-mirror/wayland-protocols/main/unstable/xdg-foreign/xdg-foreign-unstable-v2.xml).
+This fixes the code race; it does not conclusively attribute earlier screenshots.
+No installed/public API, dependency or portal wire-format changes were made.
+
+Focused tests cover delayed preparation and show-once completion, synchronous
+parent application between simulated shell-role creation and initial commit,
+invalid import fallback, missing/unsupported/malformed handles, unavailable
+Wayland platform, timeout ignoring late successful completion, and cancellation
+before preparation. A private adapter factory and fake role signal exercise the
+real presenter/deadline/direct-connection lifecycle offscreen. They do not emulate
+a compositor or verify the actual registry/import protocol exchange or placement.
+
+Reused the recorded installed Core/Quick, Search and Qt artifacts, with their
+existing provider-revisions.tsv, GCC 16.2.1 and Qt 6.12.0. Files remains clean at
+cfc130e3cd0b0eb56a94f6b9435d433bc96cb78e and Search remains clean at
+26067775e2eac3d9a779b3114dfbddc96834c7de. The clean Qt source checkout has advanced
+to 918d14dd7c739569233a16fd469e0063b9316971; this acceptance uses the installed
+6c7ac33004702e166b8c152dcde918296be54286 artifact recorded by the dependency
+ledger, not that newer checkout. Provider sources were not rebuilt or changed.
+
+Commands use the same installed prefix/import arguments recorded above:
+
+- Focused Debug build and ctest --test-dir build/debug -R '^portal-tests$' --output-on-failure.
+- Fresh Release configuration/build in build/parent-acceptance, followed by affected
+  incremental rebuilds after test coverage and style corrections. Complete configure
+  and build logs reviewed: no compiler warnings; expected GuiPrivate ABI notice only.
+- ctest --test-dir build/parent-acceptance --output-on-failure: both entries pass;
+  49 QtTest passes, zero failures, one existing activation-only skip, plus three
+  staged-activation passes.
+- python3 scripts/check-cpp.py build/parent-acceptance: all nine translation units pass.
+- python3 scripts/check-format.py, cmake --build build/parent-acceptance --target all_qmllint,
+  reuse lint and git diff --check pass.
+
+D-Bus and REUSE checks required sandbox escalation for local socket creation.
+Logs are /tmp/portal-parent-{configure,build,build-final,debug,debug-final,cpp-final}.log
+and build/parent-acceptance/Testing/Temporary/LastTest.log.
+
+FC-T11 is In Progress. User-run Hyprland inspection with
+bash build/parent-acceptance/native-check.sh open reported that modal checks passed.
+Non-modal/unparented pickers remained open after parent closure. The probe required
+Ctrl+C after dismissal; probe shutdown remains an open follow-up outside this
+publication handoff. Repeated Ctrl+O/Esc with freshly activated and already running
+real backend instances also remains pending; the current isolated probe issues one
+request. These results do not close the broader compositor or ecosystem matrix.
+No desktop pointer/focus automation or system installation was performed for this
+fix. Publication and umbrella pinning are tracked in the umbrella ledger.
+
+Publication review reused the completed clean build, CTest and quality-check
+evidence above. After recording the manual results, local SDD Markdown links and
+git diff --check passed; no implementation changed or acceptance rebuild was needed.

@@ -1,5 +1,6 @@
 #include "backend.h"
 #include "presenter.h"
+#include "wayland_parent.h"
 
 #include <QDBusConnectionInterface>
 #include <QDBusMetaType>
@@ -8,6 +9,7 @@
 #include <QDBusPendingReply>
 #include <QDir>
 #include <QFile>
+#include <QPointer>
 #include <QQuickItem>
 #include <QQuickStyle>
 #include <QQuickWindow>
@@ -62,6 +64,25 @@ QQuickItem* findEntry(QQuickItem* parent, const QString& title) {
   }
   return nullptr;
 }
+class TestSurfaceRole : public QObject {
+  Q_OBJECT
+ public:
+  void createRole() { emit surfaceRoleCreated(); }
+
+ signals:
+  void surfaceRoleCreated();
+};
+class DelayedParent : public WaylandParent {
+ public:
+  explicit DelayedParent(QObject* owner) : WaylandParent(owner) {}
+  void finish(bool valid = true) { complete(valid); }
+  void observeRole(TestSurfaceRole* role) { watchRole(role); }
+  QStringList events;
+
+ protected:
+  void prepareNative() override {}
+  void applyParent() override { events.append("parent"); }
+};
 class TestPresenter : public Presenter {
  public:
   QList<Controller*> shown;
@@ -94,6 +115,110 @@ class PortalTests : public QObject {
   Q_OBJECT
  private slots:
   void initTestCase() { registerWireTypes(); }
+  void delayedParentPreparation() {
+    QTemporaryDir directory;
+    Controller controller(folderOptions(directory.path().toUtf8()));
+    QPointer<DelayedParent> adapter;
+    QPointer<QWindow> window;
+    QmlPresenter presenter([&](QWindow* created, const QString&) {
+      window = created;
+      adapter = new DelayedParent(created);
+      return adapter.data();
+    });
+    QVERIFY(presenter.show(&controller, folderOptions(directory.path().toUtf8())));
+    QVERIFY(window);
+    QVERIFY(!window->isVisible());
+    adapter->finish();
+    QVERIFY(window->isVisible());
+    QSignalSpy visible(window, &QWindow::visibleChanged);
+    adapter->finish();
+    QCOMPARE(visible.size(), 0);
+    presenter.close(&controller);
+    QVERIFY(!adapter);
+  }
+  void parentAppliedDuringRoleCreation() {
+    TestSurfaceRole role;
+    DelayedParent adapter(nullptr);
+    adapter.observeRole(&role);
+    adapter.prepare();
+    role.createRole();
+    QVERIFY(adapter.events.isEmpty());
+    connect(&adapter, &WaylandParent::prepared, &role, [&] {
+      adapter.events.append("show");
+      role.createRole();
+      adapter.events.append("initial-commit");
+    });
+    adapter.finish();
+    QCOMPARE(adapter.events, QStringList({"show", "parent", "initial-commit"}));
+  }
+  void invalidImportedParent() {
+    TestSurfaceRole role;
+    DelayedParent adapter(nullptr);
+    adapter.observeRole(&role);
+    QSignalSpy prepared(&adapter, &WaylandParent::prepared);
+    adapter.prepare();
+    adapter.finish(false);
+    QCOMPARE(prepared.size(), 1);
+    role.createRole();
+    QVERIFY(adapter.events.isEmpty());
+  }
+  void parentPreparationTimeout() {
+    QTemporaryDir directory;
+    Controller controller(folderOptions(directory.path().toUtf8()));
+    QPointer<QWindow> window;
+    QPointer<DelayedParent> adapter;
+    TestSurfaceRole role;
+    QmlPresenter presenter([&](QWindow* created, const QString&) {
+      window = created;
+      adapter = new DelayedParent(created);
+      adapter->observeRole(&role);
+      return adapter.data();
+    });
+    QVERIFY(presenter.show(&controller, folderOptions(directory.path().toUtf8())));
+    QVERIFY(!window->isVisible());
+    QTRY_VERIFY_WITH_TIMEOUT(window->isVisible(), 1500);
+    adapter->finish();
+    role.createRole();
+    QVERIFY(adapter->events.isEmpty());
+    presenter.close(&controller);
+  }
+  void cancelParentPreparation() {
+    QTemporaryDir directory;
+    Controller controller(folderOptions(directory.path().toUtf8()));
+    QPointer<DelayedParent> adapter;
+    QPointer<QWindow> window;
+    QmlPresenter presenter([&](QWindow* created, const QString&) {
+      window = created;
+      adapter = new DelayedParent(created);
+      return adapter.data();
+    });
+    QVERIFY(presenter.show(&controller, folderOptions(directory.path().toUtf8())));
+    QVERIFY(!window->isVisible());
+    presenter.close(&controller);
+    QVERIFY(!adapter);
+    QVERIFY(!window->isVisible());
+    QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
+    QVERIFY(!window);
+  }
+  // QtTest requires the _data suffix.
+  // NOLINTNEXTLINE(readability-identifier-naming)
+  void unavailableParent_data() {
+    QTest::addColumn<QString>("handle");
+    QTest::newRow("missing") << QString{};
+    QTest::newRow("unsupported") << QString("x11:123");
+    QTest::newRow("empty-wayland") << QString("wayland:");
+    QTest::newRow("embedded-null") << QString::fromLatin1("wayland:a\0b", 11);
+    QTest::newRow("no-wayland-platform") << QString("wayland:unknown");
+  }
+  void unavailableParent() {
+    QFETCH(QString, handle);
+    QWindow window;
+    window.create();
+    WaylandParent adapter(&window, handle, &window);
+    QSignalSpy prepared(&adapter, &WaylandParent::prepared);
+    adapter.prepare();
+    QCOMPARE(prepared.size(), 1);
+  }
   void activationRuntime() {
     if (!qEnvironmentVariableIsSet("PORTAL_ACTIVATION_TEST")) {
       QSKIP("Only run with the staged activation fixture.");

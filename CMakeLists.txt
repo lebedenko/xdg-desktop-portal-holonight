@@ -18,7 +18,7 @@ add_custom_command(OUTPUT xdg-foreign-client.h
   COMMAND ${WAYLAND_SCANNER} client-header ${protocol_xml} xdg-foreign-client.h DEPENDS ${protocol_xml})
 add_custom_command(OUTPUT xdg-foreign.c
   COMMAND ${WAYLAND_SCANNER} private-code ${protocol_xml} xdg-foreign.c DEPENDS ${protocol_xml})
-add_library(portal-wayland STATIC src/wayland_parent.cpp xdg-foreign.c xdg-foreign-client.h)
+add_library(portal-wayland STATIC src/wayland_parent.cpp src/wayland_parent.h xdg-foreign.c xdg-foreign-client.h)
 target_include_directories(portal-wayland PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
 target_link_libraries(portal-wayland PRIVATE Qt6::GuiPrivate PkgConfig::WaylandClient)
 qt_add_library(portal-core STATIC)

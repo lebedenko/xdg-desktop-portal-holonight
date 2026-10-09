@@ -4,6 +4,8 @@ Status: Accepted
 
 Implementation: local automated acceptance and the user’s manual recheck passed.
 The native review issues were addressed in FC-T07 through FC-T09; FC-T06 is closed.
+FC-T10 fixes a subsequent initial-parenting race; modal checks passed by user report.
+Repeated-open verification and probe shutdown remain open in FC-T11.
 Publication and broader ecosystem acceptance remain separate handoffs.
 
 ## Requirements
@@ -38,7 +40,11 @@ SaveFiles preserves input order and bytes, numbers collisions, rejects invalid n
 Validation never creates, truncates or reserves paths; later filesystem changes remain possible.
 
 FC-005: Private xdg-foreign-v2 import uses Qt native Wayland surfaces and event-loop dispatch.
-Missing, unsupported or destroyed parents leave an ordinary chooser. Honor modality.
+Prepare registry discovery and handle import asynchronously while hidden, using private-queue
+sync callbacks. Bound preparation to one second; timeout, missing, malformed, unsupported
+or invalid parents leave an ordinary chooser. Apply parenting directly on Qt
+surfaceRoleCreated before its initial commit. Closing a pending request destroys its
+adapter and prevents a delayed show. Honor modality.
 Present as Qt.Dialog at width 820 and initial/maximum height min(600, available screen
 height minus 48), bounded below by 1 logical pixel. Clamp the 400-pixel minimum to
 that limit; preserve width constraints and allow downward resizing.

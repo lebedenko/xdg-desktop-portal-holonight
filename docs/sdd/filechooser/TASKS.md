@@ -11,6 +11,8 @@
 | FC-T07 | FC-002,003 | Fix review findings: single-file activation, single-folder clicks and hidden-file access; add regressions | Done |
 | FC-T08 | FC-005 | Bound chooser dialog height; offscreen presentation regression and automated acceptance (native check remains FC-T06) | Done |
 | FC-T09 | FC-002,003,005 | Follow picker mockup direction; clarify purpose, restore keyboard focus, improve folder Open and native probe timeout | Done |
+| FC-T10 | FC-005 | Prepare parenting before show; apply at shell-role creation; lifecycle regressions and automated acceptance | Done |
+| FC-T11 | FC-005 | Complete native repeated Ctrl+O/Esc verification for FC-T10 and investigate probe shutdown after dismissal; modal checks passed, non-modal/unparented pickers remained open after parent closure | In Progress |
 
 See [VERIFICATION.md](VERIFICATION.md). The user reported that the manual recheck
 passed on 2026-10-09, closing FC-T06 after the FC-T07 through FC-T09 fixes.
