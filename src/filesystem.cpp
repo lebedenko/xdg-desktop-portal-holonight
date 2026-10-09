@@ -126,7 +126,7 @@ Validation validateMany(const QByteArray& folder, const Names& names,
 Validation validate(Operation operation, bool directory, const QList<QByteArray>& paths, const Names& names,
                     const std::shared_ptr<std::atomic_bool>& cancelled) {
   if (paths.isEmpty()) {
-    return {.paths = {}, .error = "Select a location.", .overwrite = false};
+    return {.paths = {}, .error = directory ? "Select a folder." : "Select a file.", .overwrite = false};
   }
   for (const auto& path : paths) {
     if (!absolutePath(path)) {

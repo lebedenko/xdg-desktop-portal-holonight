@@ -11,10 +11,13 @@ import HolonightPortal.Private
 HnApplicationWindow {
     id: root
     required property Controller controller
+    readonly property int heightLimit: Math.max(1, Math.min(600, Screen.desktopAvailableHeight - 48))
+    flags: Qt.Dialog
     width: 820
-    height: 600
+    height: heightLimit
+    maximumHeight: heightLimit
     minimumWidth: 600
-    minimumHeight: 400
+    minimumHeight: Math.min(400, heightLimit)
     title: controller.title
     onClosing: event => {
         event.accepted = false;
@@ -31,6 +34,22 @@ HnApplicationWindow {
         anchors.fill: parent
         anchors.margins: 16
         spacing: 12
+        ColumnLayout {
+            Layout.fillWidth: true
+            spacing: 2
+            HnLabel {
+                objectName: "purpose"
+                role: HnTypographyRole.Subheading
+                rawText: root.controller.save ? qsTr("Save a file") : root.controller.directoryMode ? (root.controller.multiple ? qsTr("Choose folders") : qsTr("Choose a folder")) : (root.controller.multiple ? qsTr("Choose files") : qsTr("Choose a file"))
+            }
+            HnLabel {
+                Layout.fillWidth: true
+                role: HnTypographyRole.Caption
+                rawText: root.controller.title
+                elide: Text.ElideRight
+                visible: rawText.length > 0
+            }
+        }
         RowLayout {
             Layout.fillWidth: true
             Controls.Button {
@@ -48,24 +67,52 @@ HnApplicationWindow {
                     listing.forceActiveFocus();
                 }
             }
+            Controls.CheckBox {
+                objectName: "showHidden"
+                text: qsTr("Show hidden files")
+                checked: root.controller.hiddenVisible
+                onClicked: root.controller.hiddenVisible = checked
+            }
         }
         RowLayout {
             Layout.fillWidth: true
             Layout.fillHeight: true
             ColumnLayout {
-                Layout.preferredWidth: 150
-                Layout.alignment: Qt.AlignTop
-                Repeater {
-                    model: root.controller.places
-                    Controls.Button {
-                        required property var modelData
-                        Layout.fillWidth: true
-                        text: modelData.name
-                        onClicked: root.controller.navigate(modelData.path)
-                    }
+                Layout.preferredWidth: 170
+                Layout.maximumWidth: 170
+                Layout.fillHeight: true
+                HnLabel {
+                    role: HnTypographyRole.MicroHeader
+                    rawText: qsTr("Places")
                 }
-                Item {
+                ListView {
+                    id: places
+                    objectName: "places"
+                    Layout.fillWidth: true
                     Layout.fillHeight: true
+                    Layout.minimumHeight: 0
+                    clip: true
+                    model: root.controller.places
+                    Controls.ScrollBar.vertical: Controls.ScrollBar {}
+                    delegate: HnListDelegate {
+                        id: place
+                        required property var modelData
+                        width: places.width
+                        sizeRole: HnControlSize.Compact
+                        title: modelData.name
+                        highlighted: modelData.path === root.controller.location
+                        leadingContent: Component {
+                            HnIcon {
+                                size: HnMetrics.controlHeight(HnControlSize.Compact) / 2
+                                source: place.modelData.iconName ? "image://icon/" + place.modelData.iconName : ""
+                                rendering: HnIcon.Original
+                            }
+                        }
+                        onClicked: {
+                            root.controller.navigate(modelData.path);
+                            listing.forceActiveFocus();
+                        }
+                    }
                 }
             }
             ColumnLayout {
@@ -85,9 +132,13 @@ HnApplicationWindow {
                     objectName: "listing"
                     Layout.fillWidth: true
                     Layout.fillHeight: true
+                    Layout.minimumHeight: 0
                     model: root.controller.entries
                     currentIndex: root.controller.cursor
-                    onCursorRequested: row => root.controller.cursor = row
+                    onCursorRequested: row => {
+                        root.controller.select(row);
+                        listing.forceActiveFocus();
+                    }
                     onActivationRequested: row => root.controller.activate(row)
                     onSelectionToggled: row => root.controller.toggle(row)
                     delegate: RowLayout {
@@ -109,7 +160,10 @@ HnApplicationWindow {
                             // Controller exposes exact native identity independently of display text.
                             checked: root.controller.selectedIds.indexOf(entry.nativeId) >= 0
                             Accessible.name: qsTr("Select %1").arg(entry.name)
-                            onClicked: root.controller.toggle(entry.index)
+                            onClicked: {
+                                root.controller.toggle(entry.index);
+                                listing.forceActiveFocus();
+                            }
                         }
                         HnListDelegate {
                             Layout.fillWidth: true
@@ -117,13 +171,16 @@ HnApplicationWindow {
                             leadingContent: fileIcon
                             subtitle: entry.statFailed ? entry.statError : (entry.isDir ? qsTr("Folder") : "")
                             highlighted: entry.index === root.controller.cursor || root.controller.selectedIds.indexOf(entry.nativeId) >= 0
-                            onClicked: root.controller.cursor = entry.index
+                            onClicked: {
+                                root.controller.select(entry.index);
+                                listing.forceActiveFocus();
+                            }
                             onDoubleClicked: root.controller.activate(entry.index)
                             Component {
                                 id: fileIcon
                                 HnIcon {
                                     size: HnMetrics.controlHeight(HnControlSize.Compact)
-                                    source: "image://icon/" + entry.iconName
+                                    source: entry.iconName ? "image://icon/" + entry.iconName : ""
                                     rendering: HnIcon.Original
                                 }
                             }
@@ -213,6 +270,11 @@ HnApplicationWindow {
         }
         RowLayout {
             Layout.fillWidth: true
+            HnLabel {
+                role: HnTypographyRole.Caption
+                visible: root.controller.multiple
+                rawText: qsTr("%n selected", "", root.controller.selectedIds.length)
+            }
             Controls.BusyIndicator {
                 running: root.controller.busy
             }
@@ -220,14 +282,20 @@ HnApplicationWindow {
                 Layout.fillWidth: true
             }
             Controls.Button {
+                objectName: "cancel"
                 text: qsTr("Cancel")
                 onClicked: root.controller.cancel()
             }
             Controls.Button {
                 objectName: "accept"
                 text: root.controller.acceptLabel
+                highlighted: true
                 enabled: !root.controller.busy && !root.controller.overwritePending
-                onClicked: root.controller.accept()
+                onClicked: {
+                    root.controller.accept();
+                    if (!root.controller.save)
+                        listing.forceActiveFocus();
+                }
             }
         }
     }
@@ -252,6 +320,11 @@ HnApplicationWindow {
             location.forceActiveFocus();
             location.selectAll();
         }
+    }
+    Shortcut {
+        sequence: "Ctrl+H"
+        enabled: !root.controller.overwritePending
+        onActivated: root.controller.hiddenVisible = !root.controller.hiddenVisible
     }
     Shortcut {
         sequence: "/"

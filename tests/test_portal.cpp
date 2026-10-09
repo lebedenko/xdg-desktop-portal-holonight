@@ -11,6 +11,8 @@
 #include <QQuickItem>
 #include <QQuickStyle>
 #include <QQuickWindow>
+#include <QRegularExpression>
+#include <QScreen>
 #include <QSignalSpy>
 #include <QTemporaryDir>
 #include <QTest>
@@ -48,6 +50,17 @@ int findRow(Controller& controller, const QString& name) {
     }
   }
   return -1;
+}
+QQuickItem* findEntry(QQuickItem* parent, const QString& title) {
+  if (parent->property("title").toString() == title) {
+    return parent;
+  }
+  for (auto* child : parent->childItems()) {
+    if (auto* entry = findEntry(child, title)) {
+      return entry;
+    }
+  }
+  return nullptr;
 }
 class TestPresenter : public Presenter {
  public:
@@ -215,6 +228,107 @@ class PortalTests : public QObject {
     controller.accept();
     QTRY_COMPARE(done.size(), 1);
     QCOMPARE(done.front()[1].toMap().value("uris").toStringList(), QStringList{localUri(joinPath(folder, "child"))});
+  }
+  void singleFileActivationReplacesSelection() {
+    QTemporaryDir temp;
+    const auto folder = QFile::encodeName(temp.path());
+    writeFile(joinPath(folder, "first"));
+    writeFile(joinPath(folder, "second"));
+    Controller controller(folderOptions(folder));
+    QSignalSpy done(&controller, &Controller::completed);
+    QTRY_VERIFY(!controller.busy());
+    controller.toggle(findRow(controller, "first"));
+    controller.activate(findRow(controller, "second"));
+    QTRY_COMPARE(done.size(), 1);
+    QCOMPARE(done.front()[0].toUInt(), 0U);
+    QCOMPARE(done.front()[1].toMap().value("uris").toStringList(), QStringList{localUri(joinPath(folder, "second"))});
+  }
+  void singleFileKeyboardMovementUpdatesSelection() {
+    QTemporaryDir temp;
+    const auto folder = QFile::encodeName(temp.path());
+    writeFile(joinPath(folder, "first"));
+    writeFile(joinPath(folder, "second"));
+    Controller controller(folderOptions(folder));
+    QSignalSpy done(&controller, &Controller::completed);
+    QTRY_VERIFY(!controller.busy());
+    controller.select(findRow(controller, "first"));
+    controller.move(1);
+    controller.accept();
+    QTRY_COMPARE(done.size(), 1);
+    QCOMPARE(done.front()[1].toMap().value("uris").toStringList(), QStringList{localUri(joinPath(folder, "second"))});
+  }
+  // QtTest requires the _data suffix.
+  // NOLINTNEXTLINE(readability-identifier-naming)
+  void singleFolderClickSelectsDestination_data() {
+    QTest::addColumn<bool>("saveMany");
+    QTest::addColumn<bool>("previousSelection");
+    QTest::newRow("open-folder") << false << false;
+    QTest::newRow("save-files") << true << false;
+    QTest::newRow("open-folder-reselect") << false << true;
+    QTest::newRow("save-files-reselect") << true << true;
+  }
+  void singleFolderClickSelectsDestination() {
+    QFETCH(bool, saveMany);
+    QFETCH(bool, previousSelection);
+    QTemporaryDir temp;
+    const auto folder = QFile::encodeName(temp.path());
+    QVERIFY(QDir(temp.path()).mkdir("child"));
+    QVERIFY(QDir(temp.path()).mkdir("previous"));
+    auto options = folderOptions(folder);
+    options.directory = true;
+    if (saveMany) {
+      options.operation = Operation::SaveMany;
+      options.files = {"out.txt"};
+    }
+    Controller controller(options);
+    QSignalSpy done(&controller, &Controller::completed);
+    QmlPresenter presenter;
+    QVERIFY(presenter.show(&controller, options));
+    QTRY_VERIFY(!controller.busy());
+    if (previousSelection) {
+      controller.toggle(findRow(controller, "previous"));
+    }
+    QQuickItem* entry = nullptr;
+    const auto locateEntry = [&] {
+      for (auto* window : QGuiApplication::topLevelWindows()) {
+        auto* quickWindow = qobject_cast<QQuickWindow*>(window);
+        if (!quickWindow || !window->isVisible()) {
+          continue;
+        }
+        entry = findEntry(quickWindow->contentItem(), "child");
+        if (entry) {
+          return true;
+        }
+      }
+      return false;
+    };
+    QTRY_VERIFY(locateEntry());
+    // Invoke the delegate's action directly without desktop pointer/focus automation.
+    QVERIFY(QMetaObject::invokeMethod(entry, "clicked"));
+    QVERIFY(QMetaObject::invokeMethod(entry, "clicked"));
+    controller.accept();
+    QTRY_COMPARE(done.size(), 1);
+    QCOMPARE(done.front()[0].toUInt(), 0U);
+    QCOMPARE(done.front()[1].toMap().value("uris").toStringList(),
+             QStringList{localUri(joinPath(folder, saveMany ? "child/out.txt" : "child"))});
+    presenter.close(&controller);
+  }
+  void hiddenFilesCanBeRevealedAndOpened() {
+    QTemporaryDir temp;
+    const auto folder = QFile::encodeName(temp.path());
+    writeFile(joinPath(folder, ".hidden"));
+    Controller controller(folderOptions(folder));
+    QSignalSpy done(&controller, &Controller::completed);
+    QTRY_VERIFY(!controller.busy());
+    QCOMPARE(findRow(controller, ".hidden"), -1);
+    QVERIFY(controller.setProperty("hiddenVisible", true));
+    QTRY_VERIFY(findRow(controller, ".hidden") >= 0);
+    QVERIFY(controller.setProperty("hiddenVisible", false));
+    QCOMPARE(findRow(controller, ".hidden"), -1);
+    QVERIFY(controller.setProperty("hiddenVisible", true));
+    controller.activate(findRow(controller, ".hidden"));
+    QTRY_COMPARE(done.size(), 1);
+    QCOMPARE(done.front()[1].toMap().value("uris").toStringList(), QStringList{localUri(joinPath(folder, ".hidden"))});
   }
   void initialNativeSaveAndOverwrite() {
     QTemporaryDir temp;
@@ -568,11 +682,141 @@ class PortalTests : public QObject {
     QCOMPARE(reply.argumentAt<0>(), 2U);
     QCOMPARE(backend.activeRequests(), 0);
   }
+  void qmlFolderOpenAndKeyboardRecovery() {
+    QTest::failOnWarning(QRegularExpression(".*image://icon/undefined.*"));
+    QTemporaryDir temp;
+    const auto folder = QFile::encodeName(temp.path());
+    QVERIFY(QDir(temp.path()).mkdir("child"));
+    writeFile(joinPath(folder, "child/a"));
+    writeFile(joinPath(folder, "child/b"));
+    Controller controller(folderOptions(folder));
+    QmlPresenter presenter;
+    QVERIFY(presenter.show(&controller, folderOptions(folder)));
+    QTRY_VERIFY(!controller.busy());
+    QQuickWindow* window = nullptr;
+    for (auto* candidate : QGuiApplication::topLevelWindows()) {
+      if (candidate->isVisible()) {
+        window = qobject_cast<QQuickWindow*>(candidate);
+      }
+    }
+    if (window == nullptr) {
+      QFAIL("Chooser window was not created.");
+      return;
+    }
+    auto* content = window->contentItem();
+    QQuickItem* entry = nullptr;
+    QTRY_VERIFY((entry = findEntry(content, "child")));
+    auto* listing = window->findChild<QQuickItem*>("listing");
+    QVERIFY(listing);
+    entry->forceActiveFocus();
+    QVERIFY(QMetaObject::invokeMethod(entry, "clicked"));
+    QTRY_VERIFY(listing->hasActiveFocus());
+    auto* accept = window->findChild<QQuickItem*>("accept");
+    QVERIFY(accept);
+    accept->forceActiveFocus();
+    QVERIFY(QMetaObject::invokeMethod(accept, "clicked"));
+    QTRY_COMPARE(controller.location(), temp.filePath("child"));
+    QTRY_VERIFY(!controller.busy());
+    QVERIFY(controller.explanation().isEmpty());
+    QTRY_VERIFY((entry = findEntry(content, "a")));
+    entry->forceActiveFocus();
+    QVERIFY(QMetaObject::invokeMethod(entry, "clicked"));
+    QTRY_VERIFY(listing->hasActiveFocus());
+    QTest::keyClick(window, Qt::Key_J);
+    QCOMPARE(controller.cursor(), findRow(controller, "b"));
+    presenter.close(&controller);
+    QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
+  }
+  void emptyFileSelectionExplainsRequiredType() {
+    QTemporaryDir temp;
+    auto options = folderOptions(QFile::encodeName(temp.path()));
+    options.multiple = true;
+    writeFile(joinPath(options.folder, "a"));
+    Controller controller(options);
+    QTRY_VERIFY(!controller.busy());
+    controller.setCursor(findRow(controller, "a"));
+    controller.accept();
+    QTRY_COMPARE(controller.explanation(), QString("Select a file."));
+  }
+  // QtTest requires the _data suffix.
+  // NOLINTNEXTLINE(readability-identifier-naming)
+  void qmlBoundedDialog_data() {
+    QTest::addColumn<bool>("save");
+    QTest::addColumn<bool>("directory");
+    QTest::addColumn<bool>("multiple");
+    QTest::addColumn<QString>("purposeText");
+    QTest::newRow("OpenFile") << false << false << false << QString("Choose a file");
+    QTest::newRow("OpenFiles") << false << false << true << QString("Choose files");
+    QTest::newRow("OpenFolder") << false << true << false << QString("Choose a folder");
+    QTest::newRow("OpenFolders") << false << true << true << QString("Choose folders");
+    QTest::newRow("SaveFile") << true << false << false << QString("Save a file");
+  }
+  void qmlBoundedDialog() {
+    QFETCH(bool, save);
+    QFETCH(bool, directory);
+    QFETCH(bool, multiple);
+    QFETCH(QString, purposeText);
+    QTemporaryDir temp;
+    const auto folder = QFile::encodeName(temp.path());
+    for (int index = 0; index < 80; ++index) {
+      writeFile(joinPath(folder, QByteArray::number(index)));
+    }
+    auto options = folderOptions(folder);
+    options.directory = directory;
+    options.multiple = multiple;
+    if (save) {
+      options.operation = Operation::Save;
+      options.name = "new";
+    }
+    QmlPresenter presenter;
+    Controller controller(options);
+    QVERIFY(presenter.show(&controller, options));
+    QTRY_VERIFY(!controller.busy());
+    QQuickWindow* window = nullptr;
+    for (auto* candidate : QGuiApplication::topLevelWindows()) {
+      if (candidate->isVisible()) {
+        window = qobject_cast<QQuickWindow*>(candidate);
+      }
+    }
+    QVERIFY(window);
+    QCOMPARE(window->type(), Qt::Dialog);
+    const int limit = qMax(1, qMin(600, window->screen()->availableGeometry().height() - 48));
+    QCOMPARE(window->width(), 820);
+    QCOMPARE(window->height(), limit);
+    QCOMPARE(window->maximumHeight(), limit);
+    QCOMPARE(window->minimumHeight(), qMin(400, limit));
+    auto* accept = window->findChild<QQuickItem*>("accept");
+    auto* cancel = window->findChild<QQuickItem*>("cancel");
+    auto* listing = window->findChild<QQuickItem*>("listing");
+    QVERIFY(accept);
+    QVERIFY(cancel);
+    QVERIFY(listing);
+    auto* purpose = window->findChild<QQuickItem*>("purpose");
+    QVERIFY(purpose);
+    QCOMPARE(purpose->property("text").toString(), purposeText);
+    auto* places = window->findChild<QQuickItem*>("places");
+    QVERIFY(places);
+    QVERIFY(places->width() <= 170);
+    for (int height : {limit, window->minimumHeight()}) {
+      window->resize(window->width(), height);
+      for (auto* button : {accept, cancel}) {
+        QTRY_VERIFY(button->isVisible() && button->height() > 0);
+        QTRY_VERIFY(button->mapToScene(QPointF(0, button->height())).y() <= window->height());
+      }
+      QTRY_VERIFY(listing->height() > 0);
+      QTRY_VERIFY(listing->property("contentHeight").toReal() > listing->height());
+      QVERIFY(QMetaObject::invokeMethod(listing, "positionViewAtEnd"));
+      QTRY_VERIFY(listing->property("contentY").toReal() > 0);
+    }
+    presenter.close(&controller);
+    QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
+  }
   void qmlKeyboardAndFilenameFocus() {
     QTemporaryDir temp;
     const auto folder = QFile::encodeName(temp.path());
     writeFile(joinPath(folder, "a"));
     writeFile(joinPath(folder, "b"));
+    writeFile(joinPath(folder, ".hidden"));
     QmlPresenter presenter;
     auto options = folderOptions(folder);
     options.multiple = true;
@@ -586,13 +830,37 @@ class PortalTests : public QObject {
       }
     }
     QVERIFY(window);
+    auto* showHidden = window->findChild<QQuickItem*>("showHidden");
+    QVERIFY(showHidden);
+    QCOMPARE(findRow(controller, ".hidden"), -1);
+    QVERIFY(showHidden->setProperty("checked", true));
+    QVERIFY(QMetaObject::invokeMethod(showHidden, "clicked"));
+    QTRY_VERIFY(findRow(controller, ".hidden") >= 0);
+    QTest::keyClick(window, Qt::Key_H, Qt::ControlModifier);
+    QTRY_COMPARE(findRow(controller, ".hidden"), -1);
+    QVERIFY(!showHidden->property("checked").toBool());
     auto* listing = window->findChild<QQuickItem*>("listing");
     QVERIFY(listing);
-    listing->forceActiveFocus();
+    controller.setCursor(findRow(controller, "a"));
+    auto* accept = window->findChild<QQuickItem*>("accept");
+    QVERIFY(accept);
+    accept->forceActiveFocus();
+    QVERIFY(QMetaObject::invokeMethod(accept, "clicked"));
+    QTRY_COMPARE(controller.explanation(), QString("Select a file."));
+    QQuickItem* clickedEntry = nullptr;
+    QTRY_VERIFY((clickedEntry = findEntry(window->contentItem(), "a")));
+    clickedEntry->forceActiveFocus();
+    QVERIFY(QMetaObject::invokeMethod(clickedEntry, "clicked"));
+    QTRY_VERIFY(listing->hasActiveFocus());
+    QTest::keyClick(window, Qt::Key_J);
+    QCOMPARE(controller.cursor(), findRow(controller, "b"));
     controller.setCursor(findRow(controller, "a"));
     QTest::keyClick(window, Qt::Key_Space);
     const auto selection = controller.selectedIds();
     QVERIFY(!selection.isEmpty());
+    controller.select(findRow(controller, "b"));
+    QCOMPARE(controller.selectedIds(), selection);
+    controller.setCursor(findRow(controller, "a"));
     QTest::keyClick(window, Qt::Key_J);
     QCOMPARE(controller.selectedIds(), selection);
     QCOMPARE(controller.cursor(), findRow(controller, "b"));

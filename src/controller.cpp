@@ -96,12 +96,13 @@ Controller::Controller(Options options, QObject* parent)
     : QObject(parent), options_(std::move(options)), reader_(new HolonightFileBrowser::DirectoryReader) {
   sorted_.setSourceModel(reader_);
   filter_.setSourceModel(&sorted_);
+  connect(&sorted_, &DirectoryProxyModel::hiddenVisibleChanged, this, &Controller::hiddenVisibleChanged);
   const auto standard = PlaceList::standardPlaces(
       QDir::homePath(), QStandardPaths::writableLocation(QStandardPaths::ConfigLocation) + "/user-dirs.dirs");
   reader_->setPlaceIcons(PlaceList::iconMap(standard));
   connect(reader_, &HolonightFileBrowser::DirectoryReader::shutdownFinished, this, [this] { reader_retired_ = true; });
   for (const auto& item : standard) {
-    places_.append(QVariantMap{{"name", item.name}, {"path", item.path}});
+    places_.append(QVariantMap{{"name", item.name}, {"path", item.path}, {"iconName", item.icon_name}});
   }
   connect(reader_, &HolonightFileBrowser::DirectoryReader::changed, this, [this] {
     if (stopped_) {
@@ -273,6 +274,7 @@ void Controller::setFilterIndex(int value) {
   refreshSearch();
   emit changed();
 }
+void Controller::setHiddenVisible(bool visible) { sorted_.setHiddenVisible(visible); }
 void Controller::navigate(const QString& path) {
   navigateNative(path == location() ? folder_ : QFile::encodeName(path));
 }
@@ -303,7 +305,7 @@ void Controller::navigateNative(const QByteArray& path) {
   emit changed();
 }
 void Controller::parentFolder() { navigateNative(parentPath(folder_)); }
-void Controller::move(int delta) { setCursor(cursor_ + delta); }
+void Controller::move(int delta) { select(std::clamp(cursor_ + delta, 0, std::max(0, filter_.rowCount() - 1))); }
 QByteArray Controller::rowPath(int row) const {
   return filter_.index(row, 0).data(DirectoryRoles::NativePathRole).toByteArray();
 }
@@ -312,6 +314,21 @@ bool Controller::selectable(int row) const {
   return index.isValid() && !index.data(DirectoryRoles::IsParentRole).toBool() &&
          !index.data(DirectoryRoles::StatFailedRole).toBool() &&
          (options_.directory == index.data(DirectoryRoles::IsDirRole).toBool());
+}
+void Controller::select(int row) {
+  if (row < 0 || row >= filter_.rowCount()) {
+    return;
+  }
+  setCursor(row);
+  if (!multiple() && !save()) {
+    invalidateValidation();
+    selected_.clear();
+    if (selectable(row)) {
+      selected_.append(rowPath(row));
+    }
+    emit selectionChanged();
+    emit changed();
+  }
 }
 void Controller::activate(int row) {
   if (row < 0 || row >= filter_.rowCount()) {
@@ -325,8 +342,8 @@ void Controller::activate(int row) {
     emit filenameChanged();
     invalidateValidation();
     emit changed();
-  } else if (!multiple()) {
-    setCursor(row);
+  } else if (!multiple() && selectable(row)) {
+    select(row);
     accept();
   }
 }
@@ -392,7 +409,14 @@ void Controller::refreshSearch() {
     return searchFolder(records, query, token, mimeNeeded);
   }));
 }
-void Controller::accept() { startValidation(false); }
+void Controller::accept() {
+  if (!busy() && options_.operation == Operation::Open && !options_.directory && selected_.isEmpty() &&
+      cursorIsDirectory()) {
+    activate(cursor_);
+    return;
+  }
+  startValidation(false);
+}
 void Controller::startValidation(bool overwriteConfirmed) {
   if (stopped_ || busy() || overwrite_pending_) {
     return;

@@ -2,9 +2,9 @@
 
 Status: Accepted
 
-Implementation: local automated acceptance passed. Native review reported multiple issues;
-the user requested that they be addressed individually after this implementation checkpoint.
-Native acceptance remains open; no publication or ecosystem acceptance is implied.
+Implementation: local automated acceptance and the user’s manual recheck passed.
+The native review issues were addressed in FC-T07 through FC-T09; FC-T06 is closed.
+Publication and broader ecosystem acceptance remain separate handoffs.
 
 ## Requirements
 
@@ -15,13 +15,22 @@ Reject duplicate handles, handle broker disappearance and shutdown without neste
 
 FC-002: Use installed HolonightFileBrowser Core/Quick, HolonightSearch and HolonightQt.
 Compose standard places, location, passive directory listing, filter, choices and footer.
-Directories stay navigable through filters. Preserve provider sorting and hidden policy.
+Follow docs/mockups/file-picker.png for presentation direction: visible purpose/request
+title, compact icon-bearing Places delegates in a scrollable sidebar, and a stable footer.
+Show the selection mode explicitly and the selection count for multiple selection.
+Directories stay navigable through filters. Preserve provider sorting; hide dotfiles by
+default and expose the provider's hidden-files toggle through a control and Ctrl+H.
 Search only the current folder; discard stale worker results.
 
 FC-003: Keep native bytes for identity and filesystem operations and percent-encoded local
 URIs. Cursor movement must not alter multi-selection. Clear selection on navigation, retain
 it through filtering. Directory selection defaults to current folder if selection is empty.
 Support j/k, h/l, /, Ctrl+L, Enter, Space and visible selection controls.
+Single-selection clicks and j/k movement select the entry, including destinations for
+SaveFiles; repeated clicks keep it selected. Activating a single file replaces the previous
+explicit selection.
+In file mode, Open with an unselected cursor folder navigates into that folder. Row and
+selection-control clicks return focus to the listing, preserving keyboard navigation.
 
 FC-004: SaveFile focuses filename initially, prefers current_file then current_folder/name,
 falls back to Home with explanation, validates asynchronously and confirms overwrites.
@@ -30,6 +39,9 @@ Validation never creates, truncates or reserves paths; later filesystem changes 
 
 FC-005: Private xdg-foreign-v2 import uses Qt native Wayland surfaces and event-loop dispatch.
 Missing, unsupported or destroyed parents leave an ordinary chooser. Honor modality.
+Present as Qt.Dialog at width 820 and initial/maximum height min(600, available screen
+height minus 48), bounded below by 1 logical pixel. Clamp the 400-pixel minimum to
+that limit; preserve width constraints and allow downward resizing.
 
 FC-006: Install executable, D-Bus service and holonight-filechooser.portal. Bus identity is
 org.freedesktop.impl.portal.desktop.holonight_filechooser. Shell Settings is unaffected.

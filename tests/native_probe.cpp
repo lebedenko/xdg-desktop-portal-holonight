@@ -14,6 +14,7 @@
 #include <QtGui/qpa/qplatformwindow_p.h>
 
 #include <cstring>
+#include <limits>
 #include <wayland-client.h>
 
 // A manual native host. It never moves the pointer, activates a window or synthesizes input.
@@ -84,7 +85,7 @@ struct Probe {
                                                   "org.freedesktop.impl.portal.FileChooser", method);
     message.setArguments({QVariant::fromValue(QDBusObjectPath("/test/native")), "native.probe", handle,
                           "Manual HoloNight chooser", options});
-    auto* watcher = new QDBusPendingCallWatcher(broker.asyncCall(message), &parent);
+    auto* watcher = new QDBusPendingCallWatcher(broker.asyncCall(message, std::numeric_limits<int>::max()), &parent);
     QObject::connect(watcher, &QDBusPendingCallWatcher::finished, &parent, [watcher] {
       QDBusPendingReply<uint, QVariantMap> reply(*watcher);
       if (reply.isError()) {

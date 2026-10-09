@@ -100,3 +100,143 @@ a published submodule pin require a separate handoff. I-003 routing has not star
 Hyprland/Sway/labwc review, real-broker integration and sandbox document-access acceptance
 remain required in I-004 before the initiative can become Integrated. Save validation cannot
 reserve destinations against subsequent filesystem changes.
+
+## Review fixes — 2026-10-09 (FC-T07)
+
+Fixed single-file activation returning an earlier explicit selection, single-folder clicks
+not selecting OpenFile/SaveFiles destinations, and inaccessible hidden files. Single-selection
+clicks and j/k movement now select the entry; multi-selection stays explicit. Show hidden files
+and Ctrl+H expose the existing provider toggle. Native bytes remain the selection identity.
+
+Regression tests failed before the fixes for activation, both folder operations and the missing
+hidden-files property. Final coverage also checks repeated clicks, replacement of a prior folder
+selection, keyboard movement after a single-file click, opening a revealed dotfile, the QML
+hidden-files control/shortcut, and preservation of multi-selection. QML clicks are direct signal
+invocations in the offscreen fixture; no desktop pointer or focus interaction was automated.
+
+Reused the installed providers listed above: their source revisions and dependency ledger still
+match, with GCC 16.2.1 and Qt 6.12.0. The Files artifact is the provider-only Core/Quick build;
+Search and Qt use the existing compatible Debug provider artifacts. A fresh Release consumer
+was configured in `build/review-acceptance` using the same prefix/import arguments recorded above.
+
+Verification passed:
+
+- Focused Debug build and `ctest --test-dir build/debug -R '^portal-tests$' --output-on-failure`.
+- `cmake --build build/review-acceptance -j 4`: clean build, complete build log reviewed,
+  no compiler warnings; configuration emits only the expected Qt GuiPrivate ABI notice.
+- `ctest --test-dir build/review-acceptance --output-on-failure`: both targets pass;
+  32 QtTest passes with the intentional activation-only skip, plus three staged-activation passes.
+- `python3 scripts/check-cpp.py build/review-acceptance`: all nine translation units pass.
+- `python3 scripts/check-format.py`, `cmake --build build/review-acceptance --target all_qmllint`,
+  `reuse lint`, and `git diff --check` pass.
+
+Logs remain under `build/review-acceptance` (`build.log`, `check-cpp.log`, `tidy/`, and
+`Testing/Temporary/LastTest.log`). Isolated D-Bus and REUSE required permission to create local
+sockets. FC-T06 manual compositor acceptance remains open; these automated fixes do not establish
+a successful native recheck or authorize publication/integration.
+
+## Bounded chooser height — 2026-10-09 (FC-T08)
+
+Added Qt.Dialog before native window creation, with initial/maximum height
+max(1, min(600, Screen.desktopAvailableHeight - 48)) in logical pixels. The
+400-pixel minimum is clamped to the same limit. Width, private parenting and
+request-controlled modality are unchanged; no public API changes.
+
+The new offscreen OpenFile/SaveFile regression failed before the fix (Window
+instead of Dialog). It checks initial width/height, maximum height, consistent
+minimum constraints, visible action buttons and scrolling an 80-file listing at
+the initial height. The existing 400-pixel minimum layout can push the footer
+outside the window because of the places column; that separate layout limitation
+is not resolved by this focused sizing fix. Extremely short screens likewise
+retain consistent window constraints without guaranteeing all content fits.
+
+Reused the previously recorded installed providers: Files, Qt and Search sources
+remain clean at their recorded revisions, and the Files dependency revision ledger
+matches. Toolchain remains GCC 16.2.1 / Qt 6.12.0. Configured a fresh Release consumer
+in build/height-acceptance with the same prefix/import arguments as above.
+
+Verification:
+
+- Focused Debug portal-tests passed.
+- Clean Release build passed; complete configure/build logs reviewed, no compiler
+  warnings, only the expected Qt GuiPrivate ABI notice. An incremental test rebuild
+  followed the QtTest naming annotation and test cleanup.
+- CTest in build/height-acceptance: both entries passed; 34 QtTest passes with the
+  intentional activation-only skip, plus three staged-activation passes.
+- C++ checks passed all nine translation units.
+- Formatting, all_qmllint, REUSE and git diff --check passed.
+
+Logs: /tmp/portal-height-{configure,build,build-final,debug,cpp}.log and
+build/height-acceptance/Testing/Temporary/LastTest.log. D-Bus and REUSE required
+sandbox escalation to create local sockets.
+
+Read-only hyprctl clients -j found no open chooser. Requested manual parented and
+unparented checks using build/height-acceptance/native-check.sh; native geometry,
+parenting and modality are pending user review, not established by offscreen tests.
+FC-T06 remains open. No publication or umbrella pin update was performed.
+
+## Picker presentation and interaction — 2026-10-09 (FC-T09)
+
+User native review: clicking the parent did not focus it and the chooser remained
+above it. This supports modality in the tested parented configuration, not full
+compositor acceptance. The user reported unclear file/folder intent, vague
+"Select a location" feedback, keyboard navigation lost after clicking Open and a
+row, an image://icon/undefined warning, and NoReply from the manual probe.
+
+Used docs/mockups/file-picker.png as visual direction within the existing scope:
+visible mode heading and request title, compact HnListDelegate Places rows with
+provider icons and current-location highlighting, a scrollable bounded sidebar,
+multiple-selection count and emphasized primary action. HnLabel supplies shared
+typography. No changes to holonight-qt were required; its existing primitives are
+appropriate. Preview, history, device browsing and additional mockup features
+remain outside this focused follow-up.
+
+Open on a cursor folder in file mode now navigates when no files are selected.
+Folder-mode acceptance still returns selected folders. Empty selections explain
+which type is required. Row/selection-control/Places clicks restore listing focus;
+the primary action restores it in browsing mode. Guarded icon sources avoid
+constructing image://icon/undefined while delegate roles change or disappear.
+The native probe uses INT_MAX for the delayed D-Bus call rather than the default
+short timeout, so manual interaction does not expire after approximately 25 seconds.
+
+Offscreen regressions check folder-click/Open navigation, j/k after delegate focus,
+keyboard recovery after empty multi-selection feedback, all five visible mode
+headings, bounded Places width, long-list scrolling and visible action buttons at
+both initial and minimum heights. The previous 400-pixel footer limitation is
+resolved by replacing the vertically expanding Places buttons with a scrollable
+sidebar; extremely short screens still cannot guarantee all controls fit. The
+navigation test rejects image://icon/undefined warnings. No desktop input was
+automated.
+
+Reused the same clean provider revisions and compatible installed artifacts as
+FC-T08. A fresh Release build in build/design-acceptance passed with no compiler
+warnings after complete configure/build log review (expected GuiPrivate ABI notice
+only). Focused Debug portal tests passed. Full Release CTest passed both entries:
+39 QtTest passes with the intentional activation-only skip, plus three staged
+activation passes. Formatting, all_qmllint, REUSE and git diff --check passed.
+C++ checks passed all nine translation units, with the affected test unit rechecked
+after adding an explicit null-window guard for the analyzer. Test-only lint corrections
+received an incremental rebuild and affected checks.
+Logs remain in /tmp/portal-design-{configure,build,build-final,debug,cpp}.log and
+build/design-acceptance/Testing/Temporary/LastTest.log.
+
+Manual recheck: bash build/design-acceptance/native-check.sh open, multi, directory,
+and save. Verify the new layout, folder navigation, keyboard recovery and console
+output on Hyprland. The reported native console failures have automated coverage
+or a concrete probe timeout correction, but a successful native recheck remains
+pending. FC-T06 remains open. No publication or umbrella changes were made.
+
+## Manual recheck passed — 2026-10-09 (FC-T06 closure)
+
+After the FC-T09 implementation and the request to review the updated native probe
+in build/design-acceptance, the user reported: "manual checks passed".
+Record this as user-reported successful manual acceptance of the current chooser
+follow-up, superseding the earlier failed/deferred native review and pending recheck.
+No additional per-mode results, measured compositor geometry or console logs were
+provided; the detailed automated evidence remains in FC-T08 and FC-T09 above.
+
+FC-T06 is Done. This closes the repository-local native review follow-up, not the
+broader compositor matrix, real-broker/document-access or umbrella integration
+acceptance. No publication, commit or umbrella pin/status change was performed.
+This closure edits only SDD documentation; git diff --check passed. Existing build,
+test and quality-check evidence is unchanged and was not rerun.

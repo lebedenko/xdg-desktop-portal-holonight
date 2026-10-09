@@ -50,6 +50,7 @@ class Controller : public QObject {
   Q_PROPERTY(bool multiple READ multiple CONSTANT)
   Q_PROPERTY(bool directoryMode READ directoryMode CONSTANT)
   Q_PROPERTY(bool save READ save CONSTANT)
+  Q_PROPERTY(bool hiddenVisible READ hiddenVisible WRITE setHiddenVisible NOTIFY hiddenVisibleChanged)
   Q_PROPERTY(QString title READ title CONSTANT)
   Q_PROPERTY(QString acceptLabel READ acceptLabel CONSTANT)
   Q_PROPERTY(int cursor READ cursor WRITE setCursor NOTIFY cursorChanged)
@@ -75,6 +76,7 @@ class Controller : public QObject {
   bool multiple() const { return options_.multiple; }
   bool directoryMode() const { return options_.directory; }
   bool save() const { return options_.operation == Operation::Save; }
+  bool hiddenVisible() const { return sorted_.hiddenVisible(); }
   QString title() const { return options_.title; }
   QString acceptLabel() const { return options_.accept_label; }
   int cursor() const { return cursor_; }
@@ -86,6 +88,7 @@ class Controller : public QObject {
   void setFilename(const QString& value);
   void setCursor(int value);
   void setFilterIndex(int value);
+  void setHiddenVisible(bool visible);
   Q_INVOKABLE bool cursorIsDirectory() const {
     return filter_.index(cursor_, 0).data(DirectoryRoles::IsDirRole).toBool();
   }
@@ -94,6 +97,7 @@ class Controller : public QObject {
   void navigateNative(const QByteArray& path);
   Q_INVOKABLE void parentFolder();
   Q_INVOKABLE void move(int delta);
+  Q_INVOKABLE void select(int row);
   Q_INVOKABLE void activate(int row);
   Q_INVOKABLE void toggle(int row);
   Q_INVOKABLE void search(const QString& query);
@@ -109,6 +113,7 @@ class Controller : public QObject {
   void cursorChanged();
   void selectionChanged();
   void choicesChanged();
+  void hiddenVisibleChanged();
   void completed(uint response, const QVariantMap& results);
 
  private:

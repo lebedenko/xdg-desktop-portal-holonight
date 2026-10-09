@@ -57,14 +57,20 @@ bash build/acceptance/native-check.sh open --nonmodal
 bash build/acceptance/native-check.sh unparented
 ```
 
-The test host shows a parent and exports it through xdg-foreign-v2. Interact manually to
+The test host shows a parent and exports it through xdg-foreign-v2. Its request waits
+for a human response without the default short D-Bus timeout. Interact manually to
 check parenting, modality, parent disappearance, placement, cancellation and keyboard flow.
 No pointer movement, focus changes or synthetic input are automated by this native host.
 The offscreen regression suite exercises keyboard input in an isolated fixture.
 
 Keyboard: j/k move the cursor, h goes up, l enters a folder, / focuses folder search,
 Ctrl+L focuses location, Space toggles selection, Enter enters a cursor folder or accepts
-files. The accept button selects folders, including the current folder if none are selected.
+files. Ctrl+H or Show hidden files toggles dotfiles and hidden folders.
+In single-selection mode, clicking an entry or moving with j/k selects it; activating a
+file replaces any previous selection. The accept button uses the selected folder, including
+for SaveFiles, or the current folder if none is selected.
+In file mode, Open on an unselected folder browses into it. The visible heading
+identifies the selection mode; Places uses compact shared delegates and scrolls.
 SaveFile focuses its filename. Multi-selection is explicit and survives filtering, while
 navigation clears it. SaveFile requires overwrite confirmation; SaveFiles numbers collisions
 in input order. Neither operation creates or reserves a destination.
