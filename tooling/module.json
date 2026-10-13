@@ -1,0 +1,143 @@
+{
+  "module": "xdg-desktop-portal-holonight",
+  "cpp": true,
+  "qml": true,
+  "languages": [
+    "cpp",
+    "qml",
+    "python",
+    "bash"
+  ],
+  "dependencies": [
+    {
+      "module": "holonight-config",
+      "package": "HoloNightConfig",
+      "source_variable": "HOLONIGHT_CONFIG_SOURCE"
+    },
+    {
+      "module": "holonight-qt",
+      "package": "HolonightQt",
+      "source_variable": "HOLONIGHT_QT_SOURCE"
+    },
+    {
+      "module": "holonight-search",
+      "package": "HolonightSearch",
+      "source_variable": "HOLONIGHT_SEARCH_SOURCE"
+    },
+    {
+      "module": "holonight-files",
+      "package": "HolonightFileBrowser",
+      "source_variable": "HOLONIGHT_FILES_SOURCE",
+      "options": [
+        "-DBUILD_FILES_APP=OFF",
+        "-DBUILD_FILE_BROWSER_QUICK=ON",
+        "-DBUILD_TESTING=OFF"
+      ]
+    }
+  ],
+  "qml_modules": [
+    "HolonightPortal",
+    "HolonightPortal.Private"
+  ],
+  "wayland": true,
+  "external_dependencies": [
+    {
+      "id": "qt",
+      "scope": [
+        "build"
+      ],
+      "components": [
+        "Core",
+        "Gui",
+        "GuiPrivate",
+        "Quick",
+        "Qml",
+        "QuickControls2",
+        "DBus",
+        "Concurrent"
+      ]
+    },
+    {
+      "id": "wayland",
+      "scope": [
+        "build"
+      ]
+    },
+    {
+      "id": "wayland-scanner",
+      "scope": [
+        "build"
+      ]
+    },
+    {
+      "id": "dbus",
+      "scope": [
+        "test"
+      ]
+    },
+    {
+      "id": "compiler",
+      "scope": [
+        "tool"
+      ]
+    },
+    {
+      "id": "cmake",
+      "scope": [
+        "tool"
+      ]
+    },
+    {
+      "id": "ninja",
+      "scope": [
+        "tool"
+      ]
+    },
+    {
+      "id": "pkgconf",
+      "scope": [
+        "tool"
+      ]
+    },
+    {
+      "id": "git",
+      "scope": [
+        "tool"
+      ]
+    },
+    {
+      "id": "python",
+      "scope": [
+        "tool"
+      ]
+    },
+    {
+      "id": "qt",
+      "scope": [
+        "test"
+      ],
+      "components": [
+        "Test"
+      ]
+    },
+    {
+      "id": "fonts",
+      "scope": [
+        "runtime"
+      ]
+    },
+    {
+      "id": "mime",
+      "scope": [
+        "runtime"
+      ]
+    },
+    {
+      "id": "wayland-protocols",
+      "scope": [
+        "build"
+      ]
+    }
+  ],
+  "external_features": {}
+}

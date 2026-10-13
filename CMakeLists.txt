@@ -4,25 +4,39 @@ include(GNUInstallDirs)
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-find_package(Qt6 6.11 REQUIRED COMPONENTS Core Gui GuiPrivate Quick Qml QuickControls2 DBus Concurrent)
+include("${CMAKE_CURRENT_SOURCE_DIR}/tooling/dependencies.cmake")
+find_package(Qt6 6.11 REQUIRED COMPONENTS Core Gui Quick Qml QuickControls2 DBus Concurrent)
+find_package(Qt6 ${Qt6_VERSION} EXACT REQUIRED COMPONENTS GuiPrivate)
 qt_standard_project_setup(REQUIRES 6.11)
 find_package(HolonightFileBrowser CONFIG REQUIRED COMPONENTS Core Quick)
 find_package(HolonightSearch CONFIG REQUIRED)
 find_package(HolonightQt CONFIG REQUIRED)
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(WaylandClient REQUIRED IMPORTED_TARGET wayland-client)
-pkg_get_variable(protocols_dir wayland-protocols pkgdatadir)
+pkg_check_modules(WaylandProtocols REQUIRED wayland-protocols)
+# FindPkgConfig's pkg_get_variable splits spaces into a CMake list.
+execute_process(COMMAND "${PKG_CONFIG_EXECUTABLE}" --variable=pkgdatadir wayland-protocols
+  OUTPUT_VARIABLE protocols_dir OUTPUT_STRIP_TRAILING_WHITESPACE COMMAND_ERROR_IS_FATAL ANY)
 find_program(WAYLAND_SCANNER wayland-scanner REQUIRED)
+execute_process(COMMAND "${WAYLAND_SCANNER}" --version RESULT_VARIABLE scanner_status
+  OUTPUT_QUIET ERROR_QUIET)
+if(NOT scanner_status STREQUAL "0")
+  message(FATAL_ERROR "Invalid wayland-scanner executable: ${WAYLAND_SCANNER}")
+endif()
 set(protocol_xml "${protocols_dir}/unstable/xdg-foreign/xdg-foreign-unstable-v2.xml")
+if(NOT EXISTS "${protocol_xml}")
+  message(FATAL_ERROR "Missing xdg-foreign-v2 protocol XML: ${protocol_xml}. Install wayland-protocols.")
+endif()
 add_custom_command(OUTPUT xdg-foreign-client.h
-  COMMAND ${WAYLAND_SCANNER} client-header ${protocol_xml} xdg-foreign-client.h DEPENDS ${protocol_xml})
+  COMMAND ${WAYLAND_SCANNER} client-header ${protocol_xml} xdg-foreign-client.h DEPENDS ${protocol_xml} VERBATIM)
 add_custom_command(OUTPUT xdg-foreign.c
-  COMMAND ${WAYLAND_SCANNER} private-code ${protocol_xml} xdg-foreign.c DEPENDS ${protocol_xml})
+  COMMAND ${WAYLAND_SCANNER} private-code ${protocol_xml} xdg-foreign.c DEPENDS ${protocol_xml} VERBATIM)
 add_library(portal-wayland STATIC src/wayland_parent.cpp src/wayland_parent.h xdg-foreign.c xdg-foreign-client.h)
 target_include_directories(portal-wayland PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
 target_link_libraries(portal-wayland PRIVATE Qt6::GuiPrivate PkgConfig::WaylandClient)
 qt_add_library(portal-core STATIC)
 qt_add_qml_module(portal-core URI HolonightPortal.Private VERSION 1.0 NO_PLUGIN
+  DEPENDENCIES QtQml.Models
   OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/qml/HolonightPortal/Private
   SOURCES src/wire.cpp src/filesystem.cpp src/controller.cpp src/controller.h src/backend.cpp)
 target_include_directories(portal-core PUBLIC src)

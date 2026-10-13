@@ -7,11 +7,33 @@ The executable does not implement Settings or change desktop portal routing.
 Requires C++23, Qt >= 6.11 (including matching GuiPrivate development headers),
 wayland-client, wayland-protocols, wayland-scanner and installed HoloNight packages:
 HolonightFileBrowser Core/Quick, HolonightSearch and HolonightQt.
-The accepted Files provider revision is `cfc130e3cd0b0eb56a94f6b9435d433bc96cb78e`.
+The accepted Files provider revision is `7de2d9961a0feea28e41f80c4e834542faf1fefa`.
 
 ## Build and verify
 
-Install providers to a prefix, then configure using their installed CMake packages and QML modules:
+Run `task deps PRESET=test` explicitly to prepare supplied sibling checkouts in order:
+Config → Qt → Search → Files Core/Quick. Provider tests and the Files application are
+disabled; Files Quick is explicitly enabled. Set `HOLONIGHT_CONFIG_SOURCE`,
+`HOLONIGHT_QT_SOURCE`, `HOLONIGHT_SEARCH_SOURCE` and `HOLONIGHT_FILES_SOURCE` for other
+local sources (including paths with spaces). No source download occurs.
+
+`task configure`, `task build` and `task test` only validate installed prerequisites.
+Debug/test presets enable tests; Release disables tests and installs to `/usr`.
+Use `HOLONIGHT_DEPENDENCY_PREFIX` to consume existing internal providers without
+preparing them, and `HOLONIGHT_EXTERNAL_PREFIX` for external packages. Internal
+discovery is restricted to the approved internal prefixes, including Config as
+Qt's transitive dependency. Incompatible caches are archived, never silently reused.
+
+```sh
+task deps PRESET=test
+task test
+task build PRESET=release
+task format-check
+task tidy
+task lint PRESET=test
+```
+
+Direct CMake remains supported after providers have been installed:
 
 ```sh
 cmake -S . -B build/acceptance -G Ninja -DCMAKE_BUILD_TYPE=Release \
@@ -32,8 +54,24 @@ CTest uses isolated buses without desktop services and stages installation in a 
 directory for real activation. It needs permission to bind private Unix sockets.
 
 GuiPrivate is confined to the Wayland adapter; rebuild against the exact Qt runtime version.
-`scripts/check-cpp.py` removes GCC-only flags from a temporary Clang database, leaving the
-real compiler database intact. Full logs remain under the build's `tidy/` directory.
+`scripts/check-cpp.py BUILD` and `scripts/check-format.py` retain their entrypoints
+and delegate to canonical strict checks. Tidy uses a filtered copy under
+`.cache/tooling/clang`; the compiler database remains intact. QML checks include
+formatting, qualified imports, generated metadata and `all_qmllint`.
+
+## Qualified offline CI
+
+Run `task ci:prepare` explicitly (or `python3 scripts/ci/run.py --prepare
+--provider-source-root ..` to acquire exact revisions from local repositories).
+Preparation pulls the qualified immutable Arch and REUSE images and builds the
+pinned providers with tests/application disabled. `task ci` runs Debug tests,
+Release installation, static/QML checks and licensing using `--pull=never
+--network=none`, caller UID/GID, read-only snapshots and private runtime directories.
+Acceptance never acquires images or providers. Preparation hashes cover source,
+payload, modes, symlinks and environment evidence; stale/tampered inputs fail with
+explicit preparation remediation. Compatible artifacts are reused; incompatible
+preparation is archived. Complete logs and artifacts remain in `build/ci/`.
+The accepted providers are pinned in `scripts/ci/run.py`; this repository is standalone.
 
 ## Installation
 

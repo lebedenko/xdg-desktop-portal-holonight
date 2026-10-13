@@ -1,2 +1,10 @@
 /build/
 /.cache/
+
+/compile_commands.json
+/.serena/cache/
+/.serena/memories/
+/.serena/project.local.yml
+
+__pycache__/
+*.pyc

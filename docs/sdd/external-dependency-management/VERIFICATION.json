@@ -1,0 +1,406 @@
+{
+  "work_package": "EDM-016",
+  "verification_date": "2026-10-14 (Europe/Kyiv; logs use UTC)",
+  "status": "passed locally",
+  "audit_baseline": "7f09d6bcef64086bf3c7eb8c4eee05017a6f2dae",
+  "implementation_baseline": "926de7ccff8146235a014c52a8da890dcc3b0919",
+  "umbrella_ready_checkpoint": "26856ee",
+  "provider_pin_checkpoint": "888ab1d758b7599b5870524c1dab890e5df0f7a0",
+  "cleanup_commit": "61d4ddf79e5d2c89a8c763dc845b9786a397bcae",
+  "preparation_identity": {
+    "images": {
+      "build": "ghcr.io/lebedenko/holonight-deps@sha256:37ca051c39d1688d6413c47d94b8c0f221152dac6981ec67d155f2c43ea17b40",
+      "licensing": "docker.io/fsfe/reuse@sha256:85462a75c0f8efda09ddd190b92816b70e7662577c8427429e11e1b9f25a992e"
+    },
+    "platform": "linux/amd64",
+    "providers": {
+      "holonight-config": "0ccd25f323662f50a47bb048be636160f2b7c135",
+      "holonight-qt": "7c3ce074a8c2e02e4ee8cad8cd19eb8627aa4f68",
+      "holonight-search": "5e71fd7c6494084b4fcc1b5b7a8df9bb2e690bdc",
+      "holonight-files": "7de2d9961a0feea28e41f80c4e834542faf1fefa"
+    },
+    "inputs": {
+      "tooling/VERSION": "c28fcca53637bc88e124af1725df13cb98c69dedefd62fb3cdbe1cdb6b760624",
+      "tooling/module.json": "e64a82a3afcf1e07f4a12814b2e3b37b53c90873316ddb6b41d31bba16fb6e59",
+      "tooling/dependencies.cmake": "60432555d4a599807ae44f55851c63d93c9e3d88fa7f43782e83fbe7cdd769c5",
+      "tooling/providers.cmake": "5d6e7aae9f7f6874d9fa3cf5efca17cab8c3df88ea3b312633ece6341b592876",
+      "tooling/external.py": "2e87dc012d7cdda7235d5ea2e311a2a49272ff82eac5cf3ccec7841ec610df27",
+      "tooling/workflow.py": "6c9d0a80396e61072509437cd39168caf11ca31c8abd8259f50ce2c55434837e",
+      "tooling/external-packages.json": "fbe02f85a17db3583b02fb48659ccfb54e77b0480f76eb23c4a425353cc350a3",
+      "CMakeLists.txt": "511e44a60120aee810784408092d602e0be286eb18eb9dc3e0198bade2a244a5",
+      "CMakePresets.json": "e194083789d566cbb108e591b09a8278fb730321ceb184692f38f7f776f7b02f",
+      "Taskfile.yml": "9c13649494a93d7ac164aadc3812f47e10c777f721d8165f989c9c184bca2516",
+      "scripts/ci/lane.sh": "8fdd759a06087bf07e0be943a59635b1f4b31d64a632319470e2ad9a38f85749",
+      "scripts/ci/run.py": "e63781899f20b6bc1e282bd7a10e30bc828d66a7589bfc14ce526ab0d95e3ce6"
+    }
+  },
+  "prepared_manifest_sha256": "3d24d1c49823bf3ad3d010a170bdbd29b56b4869f7624117afd6fe1bbc6b146a",
+  "image_ids": {
+    "build": "sha256:51bb1aed43c0ad4e9336ed49962862ec78293f4380fd05e73b954e88c6c479c7",
+    "licensing": "sha256:2575b4ad3a736a14323c7705b708e0027109930a1511cce4e65cd09b9dfc1cc4"
+  },
+  "runtime": "Docker version 29.9.0, build f415da838b",
+  "packages": {
+    "qt6-base": "6.11.2-3",
+    "qt6-declarative": "6.11.2-2",
+    "gcc": "16.2.1+r23+gd564253eb6c8-1",
+    "clang": "22.1.8-1",
+    "cmake": "4.4.3-2",
+    "ninja": "1.13.2-3",
+    "go-task": "3.53.1-1",
+    "python": "3.14.7-1",
+    "pkgconf": "3.0.7-1",
+    "wayland": "1.26.0-1",
+    "wayland-protocols": "1.49-1",
+    "dbus": "1.16.2-1"
+  },
+  "tool_versions": [
+    "Python 3.14.7",
+    "3.53.1+ff3372fc",
+    "1.13.2",
+    "clang-format version 22.1.8",
+    "LLVM (http://llvm.org/):",
+    "  LLVM version 22.1.8",
+    "  Optimized build.",
+    "QMake version 3.1",
+    "Using Qt version 6.11.2 in /usr/lib",
+    "wayland-scanner 1.26.0"
+  ],
+  "provider_state": {
+    "holonight-config": {
+      "build_type": "Debug",
+      "cmake_subdirectory": "",
+      "content": "0329c0f5df87b1fecde6253a521ad2984a40c2ca89c91c5d72e8926887ec8a05",
+      "options": [
+        "-DBUILD_TESTING=OFF"
+      ],
+      "prefix": "/work/portal/build/deps/prefix",
+      "revision": "0ccd25f323662f50a47bb048be636160f2b7c135",
+      "source": "/prepared/sources/holonight-config",
+      "toolchain": {
+        "bundle_version": "2.0.0",
+        "cc": {
+          "command": [
+            "cc"
+          ],
+          "path": "/usr/bin/gcc",
+          "version": "cc (GCC) 16.2.1 20260810\nCopyright (C) 2026 Free Software Foundation, Inc.\nThis is free software; see the source for copying conditions.  There is NO\nwarranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE."
+        },
+        "cmake": {
+          "command": [
+            "cmake"
+          ],
+          "path": "/usr/bin/cmake",
+          "version": "cmake version 4.4.3\n\nCMake suite maintained and supported by Kitware (kitware.com/cmake)."
+        },
+        "cxx": {
+          "command": [
+            "c++"
+          ],
+          "path": "/usr/bin/c++",
+          "version": "c++ (GCC) 16.2.1 20260810\nCopyright (C) 2026 Free Software Foundation, Inc.\nThis is free software; see the source for copying conditions.  There is NO\nwarranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE."
+        },
+        "environment": {},
+        "ninja": {
+          "command": [
+            "ninja"
+          ],
+          "path": "/usr/bin/ninja",
+          "version": "1.13.2"
+        },
+        "preset_context": {}
+      },
+      "wayland": true
+    },
+    "holonight-files": {
+      "build_type": "Debug",
+      "cmake_subdirectory": "",
+      "content": "d91f5a2391b8cc3b244120644e540b92c58233c7fc34319f35dae7af6f66f1b6",
+      "options": [
+        "-DBUILD_TESTING=OFF",
+        "-DBUILD_FILES_APP=OFF",
+        "-DBUILD_FILE_BROWSER_QUICK=ON",
+        "-DBUILD_TESTING=OFF"
+      ],
+      "prefix": "/work/portal/build/deps/prefix",
+      "revision": "7de2d9961a0feea28e41f80c4e834542faf1fefa",
+      "source": "/prepared/sources/holonight-files",
+      "toolchain": {
+        "bundle_version": "2.0.0",
+        "cc": {
+          "command": [
+            "cc"
+          ],
+          "path": "/usr/bin/gcc",
+          "version": "cc (GCC) 16.2.1 20260810\nCopyright (C) 2026 Free Software Foundation, Inc.\nThis is free software; see the source for copying conditions.  There is NO\nwarranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE."
+        },
+        "cmake": {
+          "command": [
+            "cmake"
+          ],
+          "path": "/usr/bin/cmake",
+          "version": "cmake version 4.4.3\n\nCMake suite maintained and supported by Kitware (kitware.com/cmake)."
+        },
+        "cxx": {
+          "command": [
+            "c++"
+          ],
+          "path": "/usr/bin/c++",
+          "version": "c++ (GCC) 16.2.1 20260810\nCopyright (C) 2026 Free Software Foundation, Inc.\nThis is free software; see the source for copying conditions.  There is NO\nwarranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE."
+        },
+        "environment": {},
+        "ninja": {
+          "command": [
+            "ninja"
+          ],
+          "path": "/usr/bin/ninja",
+          "version": "1.13.2"
+        },
+        "preset_context": {}
+      },
+      "wayland": true
+    },
+    "holonight-qt": {
+      "build_type": "Debug",
+      "cmake_subdirectory": "",
+      "content": "423b6042725d32236a574924fd274681ac4f7d482b09b7a302653bc8c3b02053",
+      "options": [
+        "-DBUILD_TESTS=OFF",
+        "-DBUILD_DEMO=OFF",
+        "-DBUILD_CONTROLS_GALLERY=OFF",
+        "-DBUILD_WAYLAND=ON"
+      ],
+      "prefix": "/work/portal/build/deps/prefix",
+      "revision": "7c3ce074a8c2e02e4ee8cad8cd19eb8627aa4f68",
+      "source": "/prepared/sources/holonight-qt",
+      "toolchain": {
+        "bundle_version": "2.0.0",
+        "cc": {
+          "command": [
+            "cc"
+          ],
+          "path": "/usr/bin/gcc",
+          "version": "cc (GCC) 16.2.1 20260810\nCopyright (C) 2026 Free Software Foundation, Inc.\nThis is free software; see the source for copying conditions.  There is NO\nwarranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE."
+        },
+        "cmake": {
+          "command": [
+            "cmake"
+          ],
+          "path": "/usr/bin/cmake",
+          "version": "cmake version 4.4.3\n\nCMake suite maintained and supported by Kitware (kitware.com/cmake)."
+        },
+        "cxx": {
+          "command": [
+            "c++"
+          ],
+          "path": "/usr/bin/c++",
+          "version": "c++ (GCC) 16.2.1 20260810\nCopyright (C) 2026 Free Software Foundation, Inc.\nThis is free software; see the source for copying conditions.  There is NO\nwarranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE."
+        },
+        "environment": {},
+        "ninja": {
+          "command": [
+            "ninja"
+          ],
+          "path": "/usr/bin/ninja",
+          "version": "1.13.2"
+        },
+        "preset_context": {}
+      },
+      "wayland": true
+    },
+    "holonight-search": {
+      "build_type": "Debug",
+      "cmake_subdirectory": "",
+      "content": "a1ad339a30ab44a81c85265a8c5581932015f90e59917007cb081e4530b7225b",
+      "options": [
+        "-DBUILD_TESTING=OFF"
+      ],
+      "prefix": "/work/portal/build/deps/prefix",
+      "revision": "5e71fd7c6494084b4fcc1b5b7a8df9bb2e690bdc",
+      "source": "/prepared/sources/holonight-search",
+      "toolchain": {
+        "bundle_version": "2.0.0",
+        "cc": {
+          "command": [
+            "cc"
+          ],
+          "path": "/usr/bin/gcc",
+          "version": "cc (GCC) 16.2.1 20260810\nCopyright (C) 2026 Free Software Foundation, Inc.\nThis is free software; see the source for copying conditions.  There is NO\nwarranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE."
+        },
+        "cmake": {
+          "command": [
+            "cmake"
+          ],
+          "path": "/usr/bin/cmake",
+          "version": "cmake version 4.4.3\n\nCMake suite maintained and supported by Kitware (kitware.com/cmake)."
+        },
+        "cxx": {
+          "command": [
+            "c++"
+          ],
+          "path": "/usr/bin/c++",
+          "version": "c++ (GCC) 16.2.1 20260810\nCopyright (C) 2026 Free Software Foundation, Inc.\nThis is free software; see the source for copying conditions.  There is NO\nwarranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE."
+        },
+        "environment": {},
+        "ninja": {
+          "command": [
+            "ninja"
+          ],
+          "path": "/usr/bin/ninja",
+          "version": "1.13.2"
+        },
+        "preset_context": {}
+      },
+      "wayland": true
+    }
+  },
+  "external_state_sha256": "a37935703d18f1188ae5ff2a33d859ddbe328999119cb99871dc39bd70921607",
+  "environment_hashes": {
+    "packages.txt": "34ec39510e95051a6fde615c2105b2eb5d3d816fe5d09dfa51e25bc1d50a1ffd",
+    "compiler.txt": "0b52fa36f98d1a1ff3f77256f64c13ac7e2264cf7f072ea7943756a0ef378028",
+    "cmake.txt": "f46066af33a13476fb604a1a1a24bb8d4dbddb6eb5855e0c24f9f7132784c9f0",
+    "versions.txt": "9a13048ed7959515c6ac326d1d230e69beca699807ab9f68a4f566dd608cfeda"
+  },
+  "commands": [
+    "python3 scripts/ci/run.py --prepare --provider-source-root ..",
+    "python3 scripts/ci/run.py",
+    "python3 scripts/ci/run.py --lane release"
+  ],
+  "lanes": {
+    "build-test": {
+      "image": "ghcr.io/lebedenko/holonight-deps@sha256:37ca051c39d1688d6413c47d94b8c0f221152dac6981ec67d155f2c43ea17b40",
+      "exit_code": 0,
+      "log_sha256": "8f2f2011e2056be8d043aca310d9881319df6806da1b7f9c6849a24f3c687a2a",
+      "run": "build/ci/20261013T215358Z-z4iaztex"
+    },
+    "static-checks": {
+      "image": "ghcr.io/lebedenko/holonight-deps@sha256:37ca051c39d1688d6413c47d94b8c0f221152dac6981ec67d155f2c43ea17b40",
+      "exit_code": 0,
+      "log_sha256": "2f174edfe66000b438d9c08d7a3dc639511c47cacc5eccbbc057938dcdcb9dff",
+      "run": "build/ci/20261013T215358Z-z4iaztex"
+    },
+    "licensing": {
+      "image": "docker.io/fsfe/reuse@sha256:85462a75c0f8efda09ddd190b92816b70e7662577c8427429e11e1b9f25a992e",
+      "exit_code": 0,
+      "log_sha256": "89ed70ac98cee5c8aa9041b682db31ebf4c49c00374789071009702e0770a649",
+      "run": "build/ci/20261013T215358Z-z4iaztex"
+    },
+    "release": {
+      "image": "ghcr.io/lebedenko/holonight-deps@sha256:37ca051c39d1688d6413c47d94b8c0f221152dac6981ec67d155f2c43ea17b40",
+      "exit_code": 0,
+      "log_sha256": "31c88e4a757a4d9e87d9904290f3a0d8e97ba7ecc7ee5bcb7da30eafe748878a",
+      "run": "build/ci/20261013T215653Z-h4k16c54"
+    }
+  },
+  "implementation_hashes": {
+    ".clang-format": "b991ca75bf44dabc170e88b4f2cd7d1cf9da964779b235306189fe55e35d95a4",
+    ".clang-tidy": "1cfe7256c14a890c67b366f46eb67a4437ee0948e3d8cece5c2725ef5f9f4fb8",
+    ".clangd": "66f4e0808d6d184566ab049d24b967a8fccd27c28e6f3f36b7d44f20b7239a8b",
+    ".github/workflows/ci.yml": "ba49e226a0f295d8c735d19f796ac5a62bba51e33dfec61f9d77f2c94056293a",
+    ".gitignore": "898fcba132ac4375cac660b4c2bde0d8a16544cd1d51dd94774fa2bbc224c08b",
+    ".qmlls.ini": "bbb10f92627c36eb0b7db091bd9c46528fbbe18fe371f77f507291690c27cc0f",
+    ".serena/project.yml": "7923b8cf402a5df8ce2e2d28874951a708fd3334910a8873ff02993cc74c9ecc",
+    "AGENTS.md": "7525d5f37bba406a6878faeb31f6945c93d8926be11f2d39d05fac1c756dd1aa",
+    "CMakeLists.txt": "511e44a60120aee810784408092d602e0be286eb18eb9dc3e0198bade2a244a5",
+    "CMakePresets.json": "e194083789d566cbb108e591b09a8278fb730321ceb184692f38f7f776f7b02f",
+    "LICENSE": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986",
+    "LICENSES/GPL-3.0-or-later.txt": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986",
+    "README.md": "cd3a2fdf3e5fb37ac13ad8e38d96790a034aac0e0d6a6dd307f536545f8d0d3d",
+    "REUSE.toml": "1e32e6dbc0cf475588a13e82625f3796a0ff7aa6a057eef9b296c1b41dc099fe",
+    "Taskfile.yml": "9c13649494a93d7ac164aadc3812f47e10c777f721d8165f989c9c184bca2516",
+    "docs/mockups/file-picker.png": "92ca0676ea4a5cd2b69033b33b78018ace638e74fba0b09f3f1c4e8d3ecb0cec",
+    "docs/sdd/external-dependency-management/SPEC.md": "197e37d5ed3c8cc94d75542c9de13f3a4602989bcac4e4def1496693cc7fd05d",
+    "docs/sdd/filechooser/README.md": "a58bac28ec2e3cd64f5b56f19d1da8c8e74f1e91f646db798bae4ef6205bbb34",
+    "docs/sdd/filechooser/TASKS.md": "08a42c21a5fa5738d446fad5fc312b5c67367b25eb6baef5bf62a8182044d62e",
+    "docs/sdd/filechooser/VERIFICATION.md": "3985aaeda2f65a02333cb58ee168350b389b63290ec37c52a49eea3579a46639",
+    "packaging/holonight-filechooser.portal": "bb1707a604002ea2412903650d0dfc95bd91642571039fa74448917e5ab42b2e",
+    "packaging/org.freedesktop.impl.portal.desktop.holonight_filechooser.service.in": "ffcec39eaa062c019ac70f6697d14ba1c8eada76b67e02ef8cc9d2785b61d85c",
+    "qml/Chooser.qml": "4f43cf4a15b6fd6c1064c95f28a7da2927f5e34f159156f69a1bad3c1a60a56f",
+    "scripts/check-cpp.py": "fc270be11161e7ca5a7ebcb97dd01af0c1fa5d996703e81a5bd437fdb0aeee40",
+    "scripts/check-format.py": "558f5a89913a05e798ca9a810519d7e9b3c1e578a21416e36085c8228ed1d6ca",
+    "scripts/check-install.py": "72796786a3354412601a86970503ea542d7695d92d14f33e96c8367c64979733",
+    "scripts/ci/check-payload.py": "4430028c474dcd5bae6ed8fd7cdd8a1d0439d47383c4162996f313de1cca78ea",
+    "scripts/ci/images.json": "971449c5da542cf20eb134eddf0abbbcdec1ea9f8d1edc517d980b21127aa5a7",
+    "scripts/ci/lane.sh": "8fdd759a06087bf07e0be943a59635b1f4b31d64a632319470e2ad9a38f85749",
+    "scripts/ci/run.py": "e63781899f20b6bc1e282bd7a10e30bc828d66a7589bfc14ce526ab0d95e3ce6",
+    "scripts/ci/test_dependencies.py": "1d781ce6f0afb483b694872516746bc865b6a5fd09a39aa6a43f8c4a8b4c2cc8",
+    "scripts/ci/test_launcher.py": "b9cf0577b78b2e28e26e29e383f0f30d352d3522eba650cd177dd98aa147e452",
+    "src/backend.cpp": "c069b26943e1af7e663fb6b984bba2e9437dfbc081d8fa8b196b6701b58b5d7a",
+    "src/backend.h": "f6e9897293a3bc6b3fe7309d8cf04d959122e3a6519ea2e5f84771c7fe3d0e4e",
+    "src/controller.cpp": "e505579ca7c36956a0bbda99a070d8f939284fb1d5f45d7d8bba9b734db3b8f1",
+    "src/controller.h": "e56477929490b080de88b5aef6c8c589ece485172cf665b853641eacaee16e35",
+    "src/filesystem.cpp": "089d1dbb9eab4118733c3628da9bcde8616d9b3ea33d763d2d395b5af316aa3b",
+    "src/filesystem.h": "ee7a912f1d9ca2b707f37664312bf7d5410b974e51a475129364e09e97062765",
+    "src/main.cpp": "3a4210081295839abc09dad8ac36c96484ac9129409295525c2e326118d86853",
+    "src/presenter.cpp": "6c9f00c898d713b1a0965fbf433f350c7af06f9e63ec1b7af0c3fd9a8170f9e5",
+    "src/presenter.h": "e950cbd01828b816ceb1f8e606fd68eb8521d1e65913aefcb6a8989179e228b9",
+    "src/wayland_parent.cpp": "4a65f4daddd6d13ce20a5ba219a998d4b9e773d28f69f07f14ad451a94824181",
+    "src/wayland_parent.h": "7cf28ae2f06686c31e8403816ab190f3d6bd6a75848bfbe3ac4dd5659c491ca4",
+    "src/wire.cpp": "d036415a6928426b3f9754c0888dc205d7d627ffb8d2347b52884866ad2a8bd9",
+    "src/wire.h": "3e121bc9b74f398309cfa08fc97e5395db2204acbfc047b85c8d9d6e7d9dc704",
+    "tests/.clang-tidy": "bdf8f59f42ef23e0c0277847d491e00d3297be9629e7e65b20569b9b6d0121f9",
+    "tests/CMakeLists.txt": "7d5b76d1789fb5fca03d2960d13ed9e56a5bb844955545e16d28ef418baefc61",
+    "tests/dbus-session.conf": "d1b830c0bb04739e9e8d0dc2014a2e6eb87566936267f5f2b07e460c727612f4",
+    "tests/native_probe.cpp": "c667619d75c5d2f29a942162889e9d76348493c11f7d35973372794b166b97c3",
+    "tests/test_portal.cpp": "d3ee0e0ef558251609e75e46317e25cd2b5476bdd9347a926dcf80464d47f782",
+    "tooling/README.md": "884413a3d13d55a0e6b13f3748e2a9ca6d05626d65b96dbe45c1064fdcf398f7",
+    "tooling/VERSION": "c28fcca53637bc88e124af1725df13cb98c69dedefd62fb3cdbe1cdb6b760624",
+    "tooling/clang-format": "b991ca75bf44dabc170e88b4f2cd7d1cf9da964779b235306189fe55e35d95a4",
+    "tooling/clang-tidy-cpp": "635d244a257646d170c194322d4ba76c38e1f7f0b592673b47c6b5888c69f539",
+    "tooling/clang-tidy-qt": "1cfe7256c14a890c67b366f46eb67a4437ee0948e3d8cece5c2725ef5f9f4fb8",
+    "tooling/clang-tidy-tests": "bdf8f59f42ef23e0c0277847d491e00d3297be9629e7e65b20569b9b6d0121f9",
+    "tooling/clangd": "66f4e0808d6d184566ab049d24b967a8fccd27c28e6f3f36b7d44f20b7239a8b",
+    "tooling/compilation.py": "f28c63e566889f81d35b1bb25c9e05dc2771c5781eb17c73b824b4aff079c846",
+    "tooling/dependencies.cmake": "60432555d4a599807ae44f55851c63d93c9e3d88fa7f43782e83fbe7cdd769c5",
+    "tooling/external-packages.json": "fbe02f85a17db3583b02fb48659ccfb54e77b0480f76eb23c4a425353cc350a3",
+    "tooling/external.py": "2e87dc012d7cdda7235d5ea2e311a2a49272ff82eac5cf3ccec7841ec610df27",
+    "tooling/module.json": "e64a82a3afcf1e07f4a12814b2e3b37b53c90873316ddb6b41d31bba16fb6e59",
+    "tooling/providers.cmake": "5d6e7aae9f7f6874d9fa3cf5efca17cab8c3df88ea3b312633ece6341b592876",
+    "tooling/qml_policy.py": "b262e848d3b7fb3c7e6c63362a652b24957bf497ab901e5e2008352958ce6131",
+    "tooling/workflow.py": "6c9d0a80396e61072509437cd39168caf11ca31c8abd8259f50ce2c55434837e"
+  },
+  "acceptance_correction": {
+    "original_run": "build/ci/20261013T215358Z-z4iaztex",
+    "original_release": {
+      "image": "ghcr.io/lebedenko/holonight-deps@sha256:37ca051c39d1688d6413c47d94b8c0f221152dac6981ec67d155f2c43ea17b40",
+      "exit_code": 1,
+      "log_sha256": "1c6b77d69c7d7cf8a0a61f2e5ddd8770f84b2269fd130ccd1454d3c77278acad"
+    },
+    "changed_files": [
+      "scripts/ci/check-payload.py"
+    ],
+    "reason": "Payload checker now parses the unchanged quoted D-Bus Exec value with shlex; only Release consumes it. Affected Release acceptance reran cleanly; three unaffected passing lanes retained."
+  },
+  "results": {
+    "ctest": "2/2",
+    "main_cases": "49 passed, 0 failed, 1 activation-only skip",
+    "staged_activation": "3 passed, 0 failed, 0 skipped; real isolated D-Bus activation",
+    "dependency_regressions": 15,
+    "launcher_regressions": 11,
+    "canonical_tooling_regressions": 32,
+    "tidy_owned_units": 9,
+    "release_payload_files": 5,
+    "qml": "format/import/metadata/lint passed; no lint warnings",
+    "declaration_equality": "pass",
+    "bundle_drift": "pass",
+    "installer_profile_consistency": "pass",
+    "syntax_whitespace": "pass"
+  },
+  "warnings_review": [
+    "Expected private Qt ABI notice; selected public/private Qt 6.11.2 match.",
+    "Optional WrapVulkanHeaders unavailable; no required Vulkan path.",
+    "Isolated offscreen fixtures lack image://icon theme assets; all runtime QWARN lines are this existing category.",
+    "Tidy third-party diagnostics suppressed by canonical header policy; existing NOLINTs preserved; no owned diagnostics."
+  ],
+  "limits": [
+    "Fresh manual Wayland/compositor/broker review pending for integration.",
+    "Routing, Debian qualification and native-probe shutdown follow-up deferred.",
+    "Publication and umbrella pinning not performed."
+  ],
+  "documentation_licensing_closure": {
+    "image": "docker.io/fsfe/reuse@sha256:85462a75c0f8efda09ddd190b92816b70e7662577c8427429e11e1b9f25a992e",
+    "exit_code": 0,
+    "log_sha256": "072e4ea67ccccae16d500f2e1fff32ad8aa32cb909886ad490e5b8302fff0b7f",
+    "run": "build/ci/20261013T220010Z-_84poim4"
+  }
+}
