@@ -21,10 +21,10 @@ class Request : public QDBusVirtualObject {
   Q_OBJECT
  public:
   Request(Backend* backend, QDBusMessage call, Options options);
-  QString introspect(const QString& path) const override;
+  [[nodiscard]] QString introspect(const QString& path) const override;
   bool handleMessage(const QDBusMessage& message, const QDBusConnection& connection) override;
   Controller* controller() { return &controller_; }
-  const QDBusMessage& call() const { return call_; }
+  [[nodiscard]] const QDBusMessage& call() const { return call_; }
   void complete(uint response, const QVariantMap& results);
 
  private:

@@ -67,29 +67,29 @@ class Controller : public QObject {
   Controller(Controller&&) = delete;
   Controller& operator=(Controller&&) = delete;
   QAbstractItemModel* entries() { return &filter_; }
-  QString query() const { return query_; }
-  QString location() const { return QString::fromUtf8(folder_); }
-  QString filename() const { return QString::fromUtf8(filename_); }
-  QString explanation() const { return explanation_; }
-  bool busy() const { return validating_ || initializing_ || reader_->scanning(); }
-  bool overwritePending() const { return overwrite_pending_; }
-  bool multiple() const { return options_.multiple; }
-  bool directoryMode() const { return options_.directory; }
-  bool save() const { return options_.operation == Operation::Save; }
-  bool hiddenVisible() const { return sorted_.hiddenVisible(); }
-  QString title() const { return options_.title; }
-  QString acceptLabel() const { return options_.accept_label; }
-  int cursor() const { return cursor_; }
-  QStringList selectedIds() const;
-  QVariantList places() const { return places_; }
-  QStringList filterNames() const;
-  int filterIndex() const { return filter_index_; }
-  QVariantList choices() const;
+  [[nodiscard]] QString query() const { return query_; }
+  [[nodiscard]] QString location() const { return QString::fromUtf8(folder_); }
+  [[nodiscard]] QString filename() const { return QString::fromUtf8(filename_); }
+  [[nodiscard]] QString explanation() const { return explanation_; }
+  [[nodiscard]] bool busy() const { return validating_ || initializing_ || reader_->scanning(); }
+  [[nodiscard]] bool overwritePending() const { return overwrite_pending_; }
+  [[nodiscard]] bool multiple() const { return options_.multiple; }
+  [[nodiscard]] bool directoryMode() const { return options_.directory; }
+  [[nodiscard]] bool save() const { return options_.operation == Operation::Save; }
+  [[nodiscard]] bool hiddenVisible() const { return sorted_.hiddenVisible(); }
+  [[nodiscard]] QString title() const { return options_.title; }
+  [[nodiscard]] QString acceptLabel() const { return options_.accept_label; }
+  [[nodiscard]] int cursor() const { return cursor_; }
+  [[nodiscard]] QStringList selectedIds() const;
+  [[nodiscard]] QVariantList places() const { return places_; }
+  [[nodiscard]] QStringList filterNames() const;
+  [[nodiscard]] int filterIndex() const { return filter_index_; }
+  [[nodiscard]] QVariantList choices() const;
   void setFilename(const QString& value);
   void setCursor(int value);
   void setFilterIndex(int value);
   void setHiddenVisible(bool visible);
-  Q_INVOKABLE bool cursorIsDirectory() const {
+  Q_INVOKABLE [[nodiscard]] bool cursorIsDirectory() const {
     return filter_.index(cursor_, 0).data(DirectoryRoles::IsDirRole).toBool();
   }
   Q_INVOKABLE void setChoice(int index, const QString& identifier);
@@ -117,8 +117,8 @@ class Controller : public QObject {
   void completed(uint response, const QVariantMap& results);
 
  private:
-  QByteArray rowPath(int row) const;
-  bool selectable(int row) const;
+  [[nodiscard]] QByteArray rowPath(int row) const;
+  [[nodiscard]] bool selectable(int row) const;
   void initializeLocation();
   void refreshSearch();
   void startValidation(bool overwriteConfirmed);
