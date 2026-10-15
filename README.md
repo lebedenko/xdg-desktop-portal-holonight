@@ -1,5 +1,7 @@
 # HoloNight FileChooser portal
 
+For current build, test, container acceptance and provider workflows, see [DEVELOPMENT.md](DEVELOPMENT.md).
+
 Standalone Qt Quick backend for `org.freedesktop.impl.portal.FileChooser`.
 Implements OpenFile, SaveFile, SaveFiles and independently cancellable Request objects.
 The executable does not implement Settings or change desktop portal routing.
@@ -11,27 +13,7 @@ The accepted Files provider revision is `7de2d9961a0feea28e41f80c4e834542faf1fef
 
 ## Build and verify
 
-Run `task deps PRESET=test` explicitly to prepare supplied sibling checkouts in order:
-Config → Qt → Search → Files Core/Quick. Provider tests and the Files application are
-disabled; Files Quick is explicitly enabled. Set `HOLONIGHT_CONFIG_SOURCE`,
-`HOLONIGHT_QT_SOURCE`, `HOLONIGHT_SEARCH_SOURCE` and `HOLONIGHT_FILES_SOURCE` for other
-local sources (including paths with spaces). No source download occurs.
-
-`task configure`, `task build` and `task test` only validate installed prerequisites.
-Debug/test presets enable tests; Release disables tests and installs to `/usr`.
-Use `HOLONIGHT_DEPENDENCY_PREFIX` to consume existing internal providers without
-preparing them, and `HOLONIGHT_EXTERNAL_PREFIX` for external packages. Internal
-discovery is restricted to the approved internal prefixes, including Config as
-Qt's transitive dependency. Incompatible caches are archived, never silently reused.
-
-```sh
-task deps PRESET=test
-task test
-task build PRESET=release
-task format-check
-task tidy
-task lint PRESET=test
-```
+See [DEVELOPMENT.md](DEVELOPMENT.md) for current native and container commands.
 
 Direct CMake remains supported after providers have been installed:
 
@@ -53,25 +35,11 @@ Qt's standard import path. Tests set the configured import paths automatically.
 CTest uses isolated buses without desktop services and stages installation in a temporary
 directory for real activation. It needs permission to bind private Unix sockets.
 
-GuiPrivate is confined to the Wayland adapter; rebuild against the exact Qt runtime version.
-`scripts/check-cpp.py BUILD` and `scripts/check-format.py` retain their entrypoints
-and delegate to canonical strict checks. Tidy uses a filtered copy under
-`.cache/tooling/clang`; the compiler database remains intact. QML checks include
-formatting, qualified imports, generated metadata and `all_qmllint`.
+See [DEVELOPMENT.md](DEVELOPMENT.md) for current native and container commands.
 
 ## Qualified offline CI
 
-Run `task ci:prepare` explicitly (or `python3 scripts/ci/run.py --prepare
---provider-source-root ..` to acquire exact revisions from local repositories).
-Preparation pulls the qualified immutable Arch and REUSE images and builds the
-pinned providers with tests/application disabled. `task ci` runs Debug tests,
-Release installation, static/QML checks and licensing using `--pull=never
---network=none`, caller UID/GID, read-only snapshots and private runtime directories.
-Acceptance never acquires images or providers. Preparation hashes cover source,
-payload, modes, symlinks and environment evidence; stale/tampered inputs fail with
-explicit preparation remediation. Compatible artifacts are reused; incompatible
-preparation is archived. Complete logs and artifacts remain in `build/ci/`.
-The accepted providers are pinned in `scripts/ci/run.py`; this repository is standalone.
+See [DEVELOPMENT.md](DEVELOPMENT.md) for current native and container commands.
 
 ## Installation
 
