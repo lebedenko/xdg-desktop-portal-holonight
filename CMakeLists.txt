@@ -24,7 +24,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 find_package(Qt6 6.11 REQUIRED COMPONENTS Core Gui Quick Qml QuickControls2 DBus Concurrent)
 find_package(Qt6 ${Qt6_VERSION} EXACT REQUIRED COMPONENTS GuiPrivate)
 qt_standard_project_setup(REQUIRES 6.11)
-find_package(HolonightFileBrowser CONFIG REQUIRED COMPONENTS Core Quick)
+find_package(HolonightFileBrowser CONFIG REQUIRED COMPONENTS Core Quick Search)
 find_package(HolonightSearch CONFIG REQUIRED)
 find_package(HolonightQt CONFIG REQUIRED)
 find_package(PkgConfig REQUIRED)
@@ -56,7 +56,7 @@ qt_add_qml_module(portal-core URI HolonightPortal.Private VERSION 1.0 NO_PLUGIN
   OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/qml/HolonightPortal/Private
   SOURCES src/wire.cpp src/filesystem.cpp src/controller.cpp src/controller.h src/backend.cpp)
 target_include_directories(portal-core PUBLIC src)
-target_link_libraries(portal-core PUBLIC Qt6::DBus Qt6::Concurrent HolonightFileBrowser::Core HolonightSearch::Search)
+target_link_libraries(portal-core PUBLIC Qt6::DBus Qt6::Concurrent HolonightFileBrowser::Search HolonightSearch::Search)
 add_library(portal-presentation STATIC src/presenter.cpp)
 target_link_libraries(portal-presentation PUBLIC portal-core Qt6::Quick HolonightFileBrowser::Quick
   PRIVATE portal-wayland HolonightQt::Core HolonightQt::Controls)

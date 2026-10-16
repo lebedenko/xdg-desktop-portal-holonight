@@ -7,36 +7,25 @@
 #include <QtConcurrent>
 
 #include <HolonightFileBrowser/places/place_list.h>
+#include <HolonightFileBrowser/search/folder_search.h>
 #include <algorithm>
 #include <fcntl.h>
 #include <fnmatch.h>
-#include <holonight/search/index.h>
 #include <unistd.h>
 
 namespace Portal {
 namespace {
-struct SearchEntry {
-  QByteArray path;
-  QString name;
-  bool directory;
-};
+using SearchEntry = HolonightFileBrowser::FolderSearchEntry;
 struct SearchResult {
   QSet<QByteArray> matches;
   QHash<QByteArray, QString> mime_names;
 };
 SearchResult searchFolder(const QList<SearchEntry>& records, const QString& query,
                           const std::shared_ptr<std::atomic_bool>& token, bool mimeNeeded) {
-  HolonightSearch::Index index;
-  QVector<HolonightSearch::Record> values;
   SearchResult result;
   for (const auto& entry : records) {
     if (token->load()) {
       return SearchResult{};
-    }
-    if (!query.isEmpty()) {
-      values.append({.id = QString::fromLatin1(entry.path.toHex()),
-                     .fields = {{.name = "name", .text = entry.name, .weight = 1}},
-                     .boost = 0});
     }
     if (mimeNeeded && !entry.directory) {
       QByteArray bytes(4096, '\0');
@@ -56,14 +45,7 @@ SearchResult searchFolder(const QList<SearchEntry>& records, const QString& quer
   if (query.isEmpty()) {
     return result;
   }
-  index.replace("folder", std::move(values));
-  HolonightSearch::Options options;
-  options.limit = static_cast<int>(records.size());
-  options.profile = HolonightSearch::Profile::Path;
-  options.cancelled = token.get();
-  for (const auto& match : index.search(query, options)) {
-    result.matches.insert(QByteArray::fromHex(match.id.toLatin1()));
-  }
+  result.matches = HolonightFileBrowser::matchFolder(records, query, *token);
   return result;
 }
 }  // namespace
@@ -213,7 +195,7 @@ void Controller::invalidateValidation() {
 }
 QStringList Controller::selectedIds() const {
   QStringList ids;
-  for (const auto& item : selected_) {
+  for (const auto& item : selection_.selected) {
     ids.append(QString::fromLatin1(item.toHex()));
   }
   return ids;
@@ -288,7 +270,7 @@ void Controller::navigateNative(const QByteArray& path) {
   initializing_ = false;
   folder_ = path;
   ++navigation_generation_;
-  selected_.clear();
+  selection_.selected.clear();
   cursor_ = 0;
   query_.clear();
   ++search_generation_;
@@ -322,9 +304,9 @@ void Controller::select(int row) {
   setCursor(row);
   if (!multiple() && !save()) {
     invalidateValidation();
-    selected_.clear();
+    selection_.selected.clear();
     if (selectable(row)) {
-      selected_.append(rowPath(row));
+      selection_.single(rowPath(row));
     }
     emit selectionChanged();
     emit changed();
@@ -353,14 +335,10 @@ void Controller::toggle(int row) {
   }
   invalidateValidation();
   const auto path = rowPath(row);
-  if (selected_.contains(path)) {
-    selected_.removeAll(path);
-  } else {
-    if (!multiple()) {
-      selected_.clear();
-    }
-    selected_.append(path);
+  if (!multiple() && !selection_.selected.contains(path)) {
+    selection_.selected.clear();
   }
+  selection_.toggle(path);
   emit selectionChanged();
   emit changed();
 }
@@ -410,7 +388,7 @@ void Controller::refreshSearch() {
   }));
 }
 void Controller::accept() {
-  if (!busy() && options_.operation == Operation::Open && !options_.directory && selected_.isEmpty() &&
+  if (!busy() && options_.operation == Operation::Open && !options_.directory && selection_.selected.isEmpty() &&
       cursorIsDirectory()) {
     activate(cursor_);
     return;
@@ -430,9 +408,9 @@ void Controller::startValidation(bool overwriteConfirmed) {
     }
     paths.append(joinPath(folder_, filename_));
   } else if (options_.operation == Operation::SaveMany) {
-    paths.append(selected_.isEmpty() ? folder_ : selected_.front());
-  } else if (!selected_.isEmpty()) {
-    paths = selected_;
+    paths.append(selection_.selected.isEmpty() ? folder_ : selection_.selected.front());
+  } else if (!selection_.selected.isEmpty()) {
+    paths = selection_.selected;
   } else if (options_.directory) {
     paths.append(folder_);
   } else if (!multiple() && selectable(cursor_)) {

@@ -7,6 +7,7 @@
 
 #include <HolonightFileBrowser/directory_proxy_model.h>
 #include <HolonightFileBrowser/directory_reader.h>
+#include <HolonightFileBrowser/selection.h>
 
 namespace Portal {
 class EntryFilter : public QSortFilterProxyModel {
@@ -130,7 +131,7 @@ class Controller : public QObject {
   EntryFilter filter_;
   QByteArray folder_;
   QByteArray filename_;
-  QList<QByteArray> selected_;
+  HolonightFileBrowser::Selection selection_;
   QVariantList places_;
   QString explanation_;
   QString query_;

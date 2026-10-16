@@ -2,8 +2,8 @@
 
 #include <QSet>
 
+#include <HolonightFileBrowser/native_path.h>
 #include <cerrno>
-#include <string_view>
 #include <sys/stat.h>
 #include <unistd.h>
 
@@ -33,24 +33,7 @@ QByteArray parentPath(const QByteArray& value) {
 QByteArray joinPath(const QByteArray& folder, const QByteArray& name) {
   return folder + (folder.endsWith('/') ? "" : "/") + name;
 }
-QString localUri(const QByteArray& path) {
-  if (!absolutePath(path)) {
-    return {};
-  }
-  static constexpr std::string_view hex = "0123456789ABCDEF";
-  QByteArray encoded("file://");
-  for (unsigned char byte : path) {
-    if ((byte >= 'a' && byte <= 'z') || (byte >= 'A' && byte <= 'Z') || (byte >= '0' && byte <= '9') || byte == '/' ||
-        byte == '-' || byte == '_' || byte == '.' || byte == '~') {
-      encoded += static_cast<char>(byte);
-    } else {
-      encoded += '%';
-      encoded += hex[byte >> 4];
-      encoded += hex[byte & 15];
-    }
-  }
-  return QString::fromLatin1(encoded);
-}
+QString localUri(const QByteArray& path) { return HolonightFileBrowser::localUrl(path).toString(QUrl::FullyEncoded); }
 namespace {
 Validation validateOpen(bool directory, const QList<QByteArray>& paths,
                         const std::shared_ptr<std::atomic_bool>& cancelled) {

@@ -8,8 +8,10 @@ The executable does not implement Settings or change desktop portal routing.
 
 Requires C++23, Qt >= 6.11 (including matching GuiPrivate development headers),
 wayland-client, wayland-protocols, wayland-scanner and installed HoloNight packages:
-HolonightFileBrowser Core/Quick, HolonightSearch and HolonightQt.
-The accepted Files provider revision is `7de2d9961a0feea28e41f80c4e834542faf1fefa`.
+HolonightFileBrowser Core/Quick/Search and HolonightQt. The browsing package now comes
+from the independent `holonight-file-browser` repository. CI pins its published revision
+in `scripts/ci/providers.json`; use `task check -- --siblings /path/to/umbrella` to test
+current sibling sources explicitly.
 
 ## Build and verify
 
