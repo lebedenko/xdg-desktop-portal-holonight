@@ -807,6 +807,84 @@ class PortalTests : public QObject {
     QCOMPARE(reply.argumentAt<0>(), 2U);
     QCOMPARE(backend.activeRequests(), 0);
   }
+  void previewFollowsCursorAndCancellation() {
+    QTemporaryDir dir;
+    QImage image(16, 8, QImage::Format_RGB32);
+    image.fill(Qt::red);
+    QVERIFY(image.save(dir.filePath("a.png")));
+    writeFile(QFile::encodeName(dir.filePath("b.txt")));
+    auto options = folderOptions(QFile::encodeName(dir.path()));
+    options.multiple = true;
+    Controller controller(options);
+    QTRY_VERIFY(!controller.busy());
+    const auto imageRow = findRow(controller, "a.png");
+    const auto textRow = findRow(controller, "b.txt");
+    QVERIFY(imageRow >= 0 && textRow >= 0);
+    controller.toggle(textRow);
+    const auto selected = controller.selectedIds();
+    controller.select(imageRow);
+    QTRY_VERIFY(controller.preview()->hasImage());
+    QCOMPARE(controller.preview()->name(), QString("a.png"));
+    QCOMPARE(controller.selectedIds(), selected);
+    controller.select(textRow);
+    QCOMPARE(controller.preview()->name(), QString("b.txt"));
+    QTRY_VERIFY(!controller.preview()->busy());
+    QVERIFY(!controller.preview()->hasImage());
+    controller.cancel();
+    QVERIFY(!controller.preview()->hasEntry());
+  }
+
+  void previewRetiresAfterRequestDestruction() {
+    QTemporaryDir dir;
+    QImage image(32, 16, QImage::Format_RGB32);
+    image.fill(Qt::blue);
+    QVERIFY(image.save(dir.filePath("pending.png")));
+    QPointer<PreviewService> service;
+    {
+      Controller controller(folderOptions(QFile::encodeName(dir.path())));
+      service = controller.preview();
+      QTRY_VERIFY(!controller.busy());
+      controller.setCursor(findRow(controller, "pending.png"));
+      QVERIFY(service->busy());
+    }
+    // Cancellation retires the service after its worker, outside controller destruction.
+    QVERIFY(!service.isNull());
+    QVERIFY(!service->hasEntry());
+    QTRY_VERIFY(service.isNull());
+  }
+
+  void compactPreviewCanBeRevealedWithoutChangingSelection() {
+    QTemporaryDir dir;
+    writeFile(QFile::encodeName(dir.filePath("image.png")));
+    auto options = folderOptions(QFile::encodeName(dir.path()));
+    QmlPresenter presenter;
+    Controller controller(options);
+    QVERIFY(presenter.show(&controller, options));
+    QTRY_VERIFY(!controller.busy());
+    QQuickWindow* window = nullptr;
+    for (auto* candidate : QGuiApplication::topLevelWindows()) {
+      if (candidate->isVisible()) {
+        window = qobject_cast<QQuickWindow*>(candidate);
+      }
+    }
+    if (window == nullptr) {
+      QFAIL("Missing chooser window");
+    }
+    window->resize(1000, 600);
+    auto* preview = window->findChild<QQuickItem*>("entryPreview");
+    auto* toggle = window->findChild<QQuickItem*>("previewToggle");
+    QVERIFY(preview && toggle);
+    QTRY_VERIFY(preview->isVisible());
+    window->resize(800, 400);
+    QTRY_VERIFY(!preview->isVisible() && toggle->isVisible());
+    const auto selection = controller.selectedIds();
+    QVERIFY(QMetaObject::invokeMethod(toggle, "clicked"));
+    QTRY_VERIFY(preview->isVisible());
+    QCOMPARE(controller.selectedIds(), selection);
+    presenter.close(&controller);
+    QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
+  }
+
   void qmlFolderOpenAndKeyboardRecovery() {
     QTest::failOnWarning(QRegularExpression(".*image://icon/undefined.*"));
     QTemporaryDir temp;
@@ -906,7 +984,7 @@ class PortalTests : public QObject {
     QVERIFY(window);
     QCOMPARE(window->type(), Qt::Dialog);
     const int limit = qMax(1, qMin(600, window->screen()->availableGeometry().height() - 48));
-    QCOMPARE(window->width(), 820);
+    QCOMPARE(window->width(), qMax(600, qMin(1160, window->screen()->availableGeometry().width() - 48)));
     QCOMPARE(window->height(), limit);
     QCOMPARE(window->maximumHeight(), limit);
     QCOMPARE(window->minimumHeight(), qMin(400, limit));
@@ -918,7 +996,7 @@ class PortalTests : public QObject {
     QVERIFY(listing);
     auto* purpose = window->findChild<QQuickItem*>("purpose");
     QVERIFY(purpose);
-    QCOMPARE(purpose->property("text").toString(), purposeText);
+    QCOMPARE(purpose->property("title").toString(), purposeText);
     auto* places = window->findChild<QQuickItem*>("places");
     QVERIFY(places);
     QVERIFY(places->width() <= 170);

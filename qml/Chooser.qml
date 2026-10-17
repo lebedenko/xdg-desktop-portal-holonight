@@ -6,6 +6,7 @@ import QtQuick.Controls as Controls
 import Holonight.Core
 import Holonight.Controls
 import Holonight.FileBrowser
+import Holonight.FileBrowser.Preview
 import HolonightPortal.Private
 
 HnApplicationWindow {
@@ -13,7 +14,10 @@ HnApplicationWindow {
     required property Controller controller
     readonly property int heightLimit: Math.max(1, Math.min(600, Screen.desktopAvailableHeight - 48))
     flags: Qt.Dialog
-    width: 820
+    property bool editingLocation: false
+    property bool compactPreview: false
+    readonly property bool previewVisible: width >= 900 || compactPreview
+    width: Math.max(600, Math.min(1160, Screen.desktopAvailableWidth - 48))
     height: heightLimit
     maximumHeight: heightLimit
     minimumWidth: 600
@@ -30,25 +34,20 @@ HnApplicationWindow {
             listing.forceActiveFocus();
     }
 
+    function editLocation(): void {
+        editingLocation = true;
+        location.forceActiveFocus();
+        location.selectAll();
+    }
+
     ColumnLayout {
         anchors.fill: parent
         anchors.margins: 16
         spacing: 12
-        ColumnLayout {
+        HnPanelHeader {
+            objectName: "purpose"
             Layout.fillWidth: true
-            spacing: 2
-            HnLabel {
-                objectName: "purpose"
-                role: HnTypographyRole.Subheading
-                rawText: root.controller.save ? qsTr("Save a file") : root.controller.directoryMode ? (root.controller.multiple ? qsTr("Choose folders") : qsTr("Choose a folder")) : (root.controller.multiple ? qsTr("Choose files") : qsTr("Choose a file"))
-            }
-            HnLabel {
-                Layout.fillWidth: true
-                role: HnTypographyRole.Caption
-                rawText: root.controller.title
-                elide: Text.ElideRight
-                visible: rawText.length > 0
-            }
+            title: root.controller.save ? qsTr("Save a file") : root.controller.directoryMode ? (root.controller.multiple ? qsTr("Choose folders") : qsTr("Choose a folder")) : (root.controller.multiple ? qsTr("Choose files") : qsTr("Choose a file"))
         }
         RowLayout {
             Layout.fillWidth: true
@@ -56,14 +55,23 @@ HnApplicationWindow {
                 text: qsTr("Up")
                 onClicked: root.controller.parentFolder()
             }
+            HnBreadcrumbBar {
+                Layout.fillWidth: true
+                visible: !root.editingLocation
+                segments: root.controller.breadcrumbLabels
+                onSegmentActivated: index => root.controller.activateBreadcrumb(index)
+                onLocationEditRequested: root.editLocation()
+            }
             Controls.TextField {
                 id: location
+                visible: root.editingLocation
                 objectName: "location"
                 Layout.fillWidth: true
                 text: root.controller.location
                 Accessible.name: qsTr("Location")
                 onAccepted: {
                     root.controller.navigate(text);
+                    root.editingLocation = false;
                     listing.forceActiveFocus();
                 }
             }
@@ -94,7 +102,7 @@ HnApplicationWindow {
                     clip: true
                     model: root.controller.places
                     Controls.ScrollBar.vertical: Controls.ScrollBar {}
-                    delegate: HnListDelegate {
+                    delegate: HnNavigationDelegate {
                         id: place
                         required property var modelData
                         width: places.width
@@ -118,14 +126,23 @@ HnApplicationWindow {
             ColumnLayout {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
-                Controls.TextField {
+                HnSearchField {
                     id: query
                     objectName: "search"
                     Layout.fillWidth: true
                     placeholderText: qsTr("Search this folder")
                     Accessible.name: qsTr("Search this folder")
-                    onTextEdited: root.controller.search(text)
+                    onTextChanged: root.controller.search(text)
                     onAccepted: listing.forceActiveFocus()
+                }
+                DetailedColumnLayout {
+                    id: detailColumns
+                    availableWidth: listing.width
+                    selectionWidth: root.controller.multiple ? 36 : 0
+                }
+                DetailedListHeader {
+                    Layout.fillWidth: true
+                    columns: detailColumns
                 }
                 DirectoryListing {
                     id: listing
@@ -141,7 +158,7 @@ HnApplicationWindow {
                     }
                     onActivationRequested: row => root.controller.activate(row)
                     onSelectionToggled: row => root.controller.toggle(row)
-                    delegate: RowLayout {
+                    delegate: DetailedListRow {
                         id: entry
                         required property int index
                         required property string name
@@ -151,13 +168,18 @@ HnApplicationWindow {
                         required property string statError
                         required property string nativeId
                         required property string iconName
+                        required property real size
+                        required property var modified
                         width: listing.width
-                        spacing: 4
-                        Controls.CheckBox {
+                        columns: detailColumns
+                        title: name
+                        filename: name
+                        sizeText: isDir ? "" : Number(size).toLocaleString(Qt.locale())
+                        modifiedText: isParent ? "" : modified.toLocaleString(Qt.locale(), Locale.ShortFormat)
+                        highlighted: index === root.controller.cursor || root.controller.selectedIds.indexOf(nativeId) >= 0
+                        selectionContent: Controls.CheckBox {
                             objectName: "selection-" + entry.nativeId
-                            visible: root.controller.multiple
                             enabled: !entry.isParent && !entry.statFailed && entry.isDir === root.controller.directoryMode
-                            // Controller exposes exact native identity independently of display text.
                             checked: root.controller.selectedIds.indexOf(entry.nativeId) >= 0
                             Accessible.name: qsTr("Select %1").arg(entry.name)
                             onClicked: {
@@ -165,26 +187,24 @@ HnApplicationWindow {
                                 listing.forceActiveFocus();
                             }
                         }
-                        HnListDelegate {
-                            Layout.fillWidth: true
-                            title: entry.name
-                            leadingContent: fileIcon
-                            subtitle: entry.statFailed ? entry.statError : (entry.isDir ? qsTr("Folder") : "")
-                            highlighted: entry.index === root.controller.cursor || root.controller.selectedIds.indexOf(entry.nativeId) >= 0
-                            onClicked: {
-                                root.controller.select(entry.index);
-                                listing.forceActiveFocus();
+                        filenameContent: RowLayout {
+                            HnIcon {
+                                size: HnMetrics.controlHeight(HnControlSize.Compact)
+                                source: entry.iconName ? "image://icon/" + entry.iconName : ""
+                                rendering: HnIcon.Original
                             }
-                            onDoubleClicked: root.controller.activate(entry.index)
-                            Component {
-                                id: fileIcon
-                                HnIcon {
-                                    size: HnMetrics.controlHeight(HnControlSize.Compact)
-                                    source: entry.iconName ? "image://icon/" + entry.iconName : ""
-                                    rendering: HnIcon.Original
-                                }
+                            HnLabel {
+                                rawText: entry.name
+                                elide: Text.ElideRight
+                                Layout.fillWidth: true
                             }
                         }
+                        Keys.onSpacePressed: root.controller.toggle(index)
+                        onClicked: {
+                            root.controller.select(index);
+                            listing.forceActiveFocus();
+                        }
+                        onDoubleClicked: root.controller.activate(index)
                     }
                     Keys.onPressed: event => {
                         if (event.key === Qt.Key_J || event.key === Qt.Key_Down)
@@ -208,6 +228,62 @@ HnApplicationWindow {
                     }
                 }
             }
+            FilePreview {
+                objectName: "entryPreview"
+                visible: root.previewVisible
+                Layout.preferredWidth: Math.min(300, root.width * 0.32)
+                Layout.fillHeight: true
+                service: root.controller.preview
+                metadataRows: service.hasEntry ? [
+                    {
+                        label: qsTr("Name"),
+                        value: service.name
+                    },
+                    {
+                        label: qsTr("Size"),
+                        value: Number(service.size).toLocaleString(Qt.locale())
+                    },
+                    {
+                        label: qsTr("Modified"),
+                        value: service.modified.toLocaleString(Qt.locale(), Locale.ShortFormat)
+                    },
+                    {
+                        label: qsTr("Type"),
+                        value: service.mimeTypeDescription
+                    },
+                    {
+                        label: qsTr("Permissions"),
+                        value: service.permissions
+                    },
+                    {
+                        label: qsTr("Dimensions"),
+                        value: service.sourcePixelSize.width > 0 ? "%1 × %2".arg(service.sourcePixelSize.width).arg(service.sourcePixelSize.height) : ""
+                    },
+                    {
+                        label: qsTr("Camera"),
+                        value: [service.exifMake, service.exifModel].filter(part => part.length > 0).join(" ")
+                    },
+                    {
+                        label: qsTr("Lens"),
+                        value: service.exifLensModel
+                    },
+                    {
+                        label: qsTr("Exposure"),
+                        value: service.exifExposureTime
+                    },
+                    {
+                        label: qsTr("ISO"),
+                        value: service.exifIso
+                    }
+                ].filter(row => String(row.value).length > 0) : []
+            }
+        }
+        Controls.ToolButton {
+            objectName: "previewToggle"
+            visible: root.width < 900
+            text: root.compactPreview ? qsTr("Hide preview") : qsTr("Show preview")
+            Accessible.name: text
+            onClicked: root.compactPreview = !root.compactPreview
         }
         RowLayout {
             visible: root.controller.save
@@ -262,39 +338,40 @@ HnApplicationWindow {
                 }
             }
         }
-        Controls.Label {
+        HnEmptyState {
             Layout.fillWidth: true
-            text: root.controller.explanation
-            wrapMode: Text.Wrap
-            visible: text.length > 0
+            titleText: root.controller.explanation
+            visible: titleText.length > 0
         }
-        RowLayout {
+        HnActionBar {
             Layout.fillWidth: true
-            HnLabel {
-                role: HnTypographyRole.Caption
-                visible: root.controller.multiple
-                rawText: qsTr("%n selected", "", root.controller.selectedIds.length)
+            leadingContent: RowLayout {
+                HnLabel {
+                    role: HnTypographyRole.Caption
+                    visible: root.controller.multiple
+                    rawText: qsTr("%n selected", "", root.controller.selectedIds.length)
+                }
+                Controls.BusyIndicator {
+                    running: root.controller.busy
+                }
             }
-            Controls.BusyIndicator {
-                running: root.controller.busy
-            }
-            Item {
-                Layout.fillWidth: true
-            }
-            Controls.Button {
-                objectName: "cancel"
-                text: qsTr("Cancel")
-                onClicked: root.controller.cancel()
-            }
-            Controls.Button {
-                objectName: "accept"
-                text: root.controller.acceptLabel
-                highlighted: true
-                enabled: !root.controller.busy && !root.controller.overwritePending
-                onClicked: {
-                    root.controller.accept();
-                    if (!root.controller.save)
-                        listing.forceActiveFocus();
+            trailingContent: RowLayout {
+
+                Controls.Button {
+                    objectName: "cancel"
+                    text: qsTr("Cancel")
+                    onClicked: root.controller.cancel()
+                }
+                Controls.Button {
+                    objectName: "accept"
+                    text: root.controller.acceptLabel
+                    highlighted: true
+                    enabled: !root.controller.busy && !root.controller.overwritePending
+                    onClicked: {
+                        root.controller.accept();
+                        if (!root.controller.save)
+                            listing.forceActiveFocus();
+                    }
                 }
             }
         }
@@ -317,8 +394,7 @@ HnApplicationWindow {
         sequence: "Ctrl+L"
         enabled: !root.controller.overwritePending
         onActivated: {
-            location.forceActiveFocus();
-            location.selectAll();
+            root.editLocation();
         }
     }
     Shortcut {

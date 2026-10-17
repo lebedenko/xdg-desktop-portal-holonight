@@ -5,8 +5,10 @@
 #include <QSortFilterProxyModel>
 #include <QtQml/qqmlregistration.h>
 
+#include <HolonightFileBrowser/breadcrumb_adapter.h>
 #include <HolonightFileBrowser/directory_proxy_model.h>
 #include <HolonightFileBrowser/directory_reader.h>
+#include <HolonightFileBrowser/preview/preview_service.h>
 #include <HolonightFileBrowser/selection.h>
 
 namespace Portal {
@@ -41,6 +43,8 @@ class Controller : public QObject {
   Q_OBJECT
   QML_ELEMENT
   QML_UNCREATABLE("Created per portal request")
+  Q_PROPERTY(PreviewService* preview READ preview CONSTANT)
+  Q_PROPERTY(QStringList breadcrumbLabels READ breadcrumbLabels NOTIFY locationChanged)
   Q_PROPERTY(QAbstractItemModel* entries READ entries CONSTANT)
   Q_PROPERTY(QString query READ query NOTIFY queryChanged)
   Q_PROPERTY(QString location READ location NOTIFY locationChanged)
@@ -67,6 +71,9 @@ class Controller : public QObject {
   Controller& operator=(const Controller&) = delete;
   Controller(Controller&&) = delete;
   Controller& operator=(Controller&&) = delete;
+  PreviewService* preview() { return preview_; }
+  [[nodiscard]] QStringList breadcrumbLabels() const { return breadcrumbs_.labels(); }
+  Q_INVOKABLE void activateBreadcrumb(int index);
   QAbstractItemModel* entries() { return &filter_; }
   [[nodiscard]] QString query() const { return query_; }
   [[nodiscard]] QString location() const { return QString::fromUtf8(folder_); }
@@ -120,11 +127,14 @@ class Controller : public QObject {
  private:
   [[nodiscard]] QByteArray rowPath(int row) const;
   [[nodiscard]] bool selectable(int row) const;
+  void syncPreview();
   void initializeLocation();
   void refreshSearch();
   void startValidation(bool overwriteConfirmed);
   void finish(const QList<QByteArray>& paths);
   void invalidateValidation();
+  PreviewService* preview_;
+  HolonightFileBrowser::BreadcrumbAdapter breadcrumbs_;
   Options options_;
   HolonightFileBrowser::DirectoryReader* reader_;
   DirectoryProxyModel sorted_;
@@ -148,5 +158,8 @@ class Controller : public QObject {
   bool overwrite_pending_ = false;
   bool stopped_ = false;
   bool reader_retired_ = false;
+  bool preview_retired_ = false;
+  bool navigating_ = false;
+  quint64 preview_revision_ = 0;
 };
 }  // namespace Portal

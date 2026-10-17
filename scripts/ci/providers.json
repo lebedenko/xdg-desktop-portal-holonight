@@ -12,12 +12,18 @@
     "revision": "3248a4566e265bdacff83deba9d9432afd980727"
   },
   {
+    "name": "holonight-images",
+    "revision": "2713d62b90f980e36221db00220c854141c598dd"
+  },
+  {
+    "name": "holonight-thumbnails",
+    "revision": "dde56208d8edc8ec6e2870dbcd44c0a9363f4b19"
+  },
+  {
     "name": "holonight-file-browser",
     "revision": "f90cea52f6f298b4fa70c611abcbed5031b78fbd",
     "options": [
       "-DBUILD_FILE_BROWSER_STORAGE=OFF",
-      "-DBUILD_FILE_BROWSER_PREVIEW=OFF",
-      "-DBUILD_FILE_BROWSER_PREVIEW_QUICK=OFF",
       "-DBUILD_FILE_BROWSER_MARKDOWN=OFF"
     ]
   }

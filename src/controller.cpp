@@ -75,7 +75,11 @@ bool EntryFilter::filterAcceptsRow(int row, const QModelIndex& parent) const {
   });
 }
 Controller::Controller(Options options, QObject* parent)
-    : QObject(parent), options_(std::move(options)), reader_(new HolonightFileBrowser::DirectoryReader) {
+    : QObject(parent),
+      preview_(new PreviewService),
+      options_(std::move(options)),
+      reader_(new HolonightFileBrowser::DirectoryReader) {
+  connect(preview_, &PreviewService::shutdownFinished, this, [this] { preview_retired_ = true; });
   sorted_.setSourceModel(reader_);
   filter_.setSourceModel(&sorted_);
   connect(&sorted_, &DirectoryProxyModel::hiddenVisibleChanged, this, &Controller::hiddenVisibleChanged);
@@ -94,12 +98,20 @@ Controller::Controller(Options options, QObject* parent)
       explanation_ = reader_->directoryError();
     }
     refreshSearch();
+    ++preview_revision_;
+    syncPreview();
     emit changed();
   });
   connect(reader_, &QAbstractItemModel::rowsInserted, this, [this] { refreshSearch(); });
   connect(reader_, &QAbstractItemModel::modelReset, this, [this] { refreshSearch(); });
   connect(&filter_, &QAbstractItemModel::modelReset, this, [this] { setCursor(cursor_); });
   connect(&filter_, &QAbstractItemModel::rowsRemoved, this, [this] { setCursor(cursor_); });
+  connect(&filter_, &QAbstractItemModel::rowsInserted, this, [this] { syncPreview(); });
+  connect(&filter_, &QAbstractItemModel::dataChanged, this, [this] {
+    ++preview_revision_;
+    syncPreview();
+  });
+  connect(&filter_, &QAbstractItemModel::layoutChanged, this, [this] { syncPreview(); });
   if (!options_.filters.isEmpty()) {
     int index = static_cast<int>(options_.filters.indexOf(options_.current_filter));
     setFilterIndex(index < 0 ? 0 : index);
@@ -165,6 +177,11 @@ void Controller::initializeLocation() {
 // NOLINTEND(clang-analyzer-cplusplus.NewDeleteLeaks)
 Controller::~Controller() {
   stop();
+  if (preview_retired_) {
+    preview_->deleteLater();
+  } else {
+    connect(preview_, &PreviewService::shutdownFinished, preview_, &QObject::deleteLater);
+  }
   filter_.setSourceModel(nullptr);
   sorted_.setSourceModel(nullptr);
   // The provider must survive its possibly blocked worker. UI ownership ends now.
@@ -183,6 +200,8 @@ void Controller::stop() {
     search_cancel_->store(true);
   }
   invalidateValidation();
+  preview_->clear();
+  preview_->shutdown();
   reader_->shutdown();
 }
 void Controller::invalidateValidation() {
@@ -244,6 +263,7 @@ void Controller::setFilename(const QString& value) {
 }
 void Controller::setCursor(int value) {
   cursor_ = std::clamp(value, 0, std::max(0, filter_.rowCount() - 1));
+  syncPreview();
   emit cursorChanged();
 }
 void Controller::setFilterIndex(int value) {
@@ -266,9 +286,12 @@ void Controller::navigateNative(const QByteArray& path) {
     emit changed();
     return;
   }
+  navigating_ = true;
+  preview_->clear();
   invalidateValidation();
   initializing_ = false;
   folder_ = path;
+  breadcrumbs_.setPath(folder_);
   ++navigation_generation_;
   selection_.selected.clear();
   cursor_ = 0;
@@ -280,11 +303,35 @@ void Controller::navigateNative(const QByteArray& path) {
   filter_.searching = false;
   filter_.refresh();
   reader_->loadNative(folder_);
+  navigating_ = false;
   emit locationChanged();
   emit queryChanged();
   emit selectionChanged();
   emit cursorChanged();
   emit changed();
+}
+void Controller::activateBreadcrumb(int index) {
+  const auto path = breadcrumbs_.nativePathAt(index);
+  if (!path.isEmpty()) {
+    navigateNative(path);
+  }
+}
+void Controller::syncPreview() {
+  if (stopped_ || navigating_) {
+    return;
+  }
+  const auto index = filter_.index(cursor_, 0);
+  if (!index.isValid() || index.data(DirectoryRoles::IsParentRole).toBool()) {
+    preview_->clear();
+    return;
+  }
+  const auto path = index.data(DirectoryRoles::NativePathRole).toByteArray();
+  preview_->setTarget(
+      QString::fromUtf8(path), index.data(DirectoryRoles::IsDirRole).toBool(),
+      index.data(DirectoryRoles::SizeRole).toLongLong(), index.data(DirectoryRoles::ModifiedRole).toDateTime(),
+      index.data(DirectoryRoles::ModeRole).toUInt(), index.data(DirectoryRoles::StatFailedRole).toBool(),
+      index.data(DirectoryRoles::StatErrorRole).toString(), index.data(DirectoryRoles::IconNameRole).toString(),
+      preview_revision_, index.data(DirectoryRoles::NameRole).toString(), path);
 }
 void Controller::parentFolder() { navigateNative(parentPath(folder_)); }
 void Controller::move(int delta) { select(std::clamp(cursor_ + delta, 0, std::max(0, filter_.rowCount() - 1))); }
@@ -365,9 +412,11 @@ void Controller::refreshSearch() {
   QList<SearchEntry> records;
   for (int row = 0; row < reader_->rowCount(); ++row) {
     auto index = reader_->index(row, 0);
-    records.append({.path = index.data(DirectoryRoles::NativePathRole).toByteArray(),
-                    .name = index.data(DirectoryRoles::NameRole).toString(),
-                    .directory = index.data(DirectoryRoles::IsDirRole).toBool()});
+    records.append({
+        .path = index.data(DirectoryRoles::NativePathRole).toByteArray(),
+        .name = index.data(DirectoryRoles::NameRole).toString(),
+        .directory = index.data(DirectoryRoles::IsDirRole).toBool(),
+    });
   }
   const auto generation = search_generation_;
   const auto token = search_cancel_ = std::make_shared<std::atomic_bool>(false);
