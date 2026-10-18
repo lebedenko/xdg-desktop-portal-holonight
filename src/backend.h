@@ -1,13 +1,16 @@
 #pragma once
 #include "controller.h"
+#include "settings.h"
 
 #include <QDBusConnection>
 #include <QDBusMessage>
 #include <QDBusServiceWatcher>
 #include <QDBusVirtualObject>
 
+#include <holonight/appearance_reader.h>
+
 namespace Portal {
-inline constexpr auto BusName = "org.freedesktop.impl.portal.desktop.holonight_filechooser";
+inline constexpr auto BusName = "org.freedesktop.impl.portal.desktop.holonight";
 inline constexpr auto DesktopPath = "/org/freedesktop/portal/desktop";
 class Presenter : public QObject {
   Q_OBJECT
@@ -59,6 +62,10 @@ class Backend : public QDBusVirtualObject {
   QDBusConnection connection_;
   Presenter* presenter_;
   QHash<QString, Request*> requests_;
+  Holonight::AppearanceReader appearance_;
+  SettingsPortalBackend settings_;
+  bool object_registered_ = false;
+  bool service_registered_ = false;
   bool stopping_ = false;
 };
 }  // namespace Portal

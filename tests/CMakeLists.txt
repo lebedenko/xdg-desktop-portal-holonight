@@ -26,3 +26,10 @@ foreach(target portal-tests portal-native-probe)
 endforeach()
 file(GENERATE OUTPUT ${PROJECT_BINARY_DIR}/native-check.sh CONTENT
   "#!/usr/bin/env bash\nset -euo pipefail\nexport QML_IMPORT_PATH='${runtime_qml}'\nexec '${DBUS_RUN_SESSION}' --config-file='${CMAKE_CURRENT_SOURCE_DIR}/dbus-session.conf' -- '$<TARGET_FILE:portal-native-probe>' \"\$@\"\n")
+
+qt_add_executable(portal-settings-tests test_settings.cpp)
+set_target_properties(portal-settings-tests PROPERTIES QT_QML_MODULE_NO_IMPORT_SCAN TRUE)
+target_link_libraries(portal-settings-tests PRIVATE portal-core Qt6::Test)
+add_test(NAME portal-settings-tests COMMAND ${DBUS_RUN_SESSION} --config-file=${CMAKE_CURRENT_SOURCE_DIR}/dbus-session.conf
+  -- $<TARGET_FILE:portal-settings-tests>)
+set_tests_properties(portal-settings-tests PROPERTIES TIMEOUT 30)

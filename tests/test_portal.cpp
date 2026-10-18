@@ -225,6 +225,19 @@ class PortalTests : public QObject {
     }
     const auto bus = QDBusConnection::sessionBus();
     QVERIFY(!bus.interface()->isServiceRegistered(BusName).value());
+    const auto readSettings = [&] {
+      auto message =
+          QDBusMessage::createMethodCall(BusName, DesktopPath, "org.freedesktop.impl.portal.Settings", "Read");
+      message.setArguments({"org.freedesktop.appearance", "color-scheme"});
+      return bus.asyncCall(message);
+    };
+    uint settingsPid = 0;
+    if (qEnvironmentVariableIsSet("PORTAL_SETTINGS_FIRST")) {
+      auto settings = readSettings();
+      QTRY_VERIFY(settings.isFinished());
+      QCOMPARE(settings.reply().signature(), "v");
+      settingsPid = bus.interface()->servicePid(BusName).value();
+    }
     auto call = callChooser(bus, "OpenFile", "/test/activation");
     QTRY_VERIFY(bus.interface()->isServiceRegistered(BusName).value());
     // Wait for export through ordinary asynchronous introspection; no nested D-Bus calls.
@@ -246,6 +259,13 @@ class PortalTests : public QObject {
     QCOMPARE(result.argumentAt<0>(), 1U);
     const auto pid = bus.interface()->servicePid(BusName);
     QVERIFY(pid.isValid());
+    if (settingsPid != 0) {
+      QCOMPARE(pid.value(), settingsPid);
+    }
+    auto settings = readSettings();
+    QTRY_VERIFY(settings.isFinished());
+    QCOMPARE(settings.reply().signature(), "v");
+    QCOMPARE(bus.interface()->servicePid(BusName).value(), pid.value());
     auto shutdownCall = callChooser(bus, "SaveFile", "/test/shutdown");
     QTRY_VERIFY(([&] {
       auto pending = bus.asyncCall(QDBusMessage::createMethodCall(BusName, "/test/shutdown",

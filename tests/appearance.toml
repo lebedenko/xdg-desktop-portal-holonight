@@ -1,0 +1,29 @@
+version = 1
+
+[theme]
+scheme = "holonight-dark"
+accent = "blue"
+
+[typography]
+ui_family = "Fira Code"
+ui_size = 14
+monospace_family = "Inconsolata"
+monospace_size = 13
+title_family = "Exo"
+title_size = 9
+display_family = "Orbitron"
+display_size = 20
+
+[icons]
+theme = "HoloNight"
+fallback = "Papirus"
+cursor = "default"
+
+[layout]
+scale = 1.25
+
+[shape]
+style = "rounded"
+scale = 1.5
+base_radius = 8.0
+base_chamfer = 3.0

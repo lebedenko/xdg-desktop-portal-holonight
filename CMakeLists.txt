@@ -54,9 +54,9 @@ qt_add_library(portal-core STATIC)
 qt_add_qml_module(portal-core URI HolonightPortal.Private VERSION 1.0 NO_PLUGIN
   DEPENDENCIES QtQml.Models
   OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/qml/HolonightPortal/Private
-  SOURCES src/wire.cpp src/filesystem.cpp src/controller.cpp src/controller.h src/backend.cpp)
+  SOURCES src/wire.cpp src/filesystem.cpp src/controller.cpp src/controller.h src/backend.cpp src/settings.cpp src/settings.h)
 target_include_directories(portal-core PUBLIC src)
-target_link_libraries(portal-core PUBLIC Qt6::DBus Qt6::Concurrent HolonightFileBrowser::Preview HolonightFileBrowser::Search HolonightSearch::Search)
+target_link_libraries(portal-core PUBLIC HolonightQt::Appearance HolonightQt::ThemeCatalog Qt6::DBus Qt6::Concurrent HolonightFileBrowser::Preview HolonightFileBrowser::Search HolonightSearch::Search)
 add_library(portal-presentation STATIC src/presenter.cpp)
 target_link_libraries(portal-presentation PUBLIC portal-core Qt6::Quick HolonightFileBrowser::Quick HolonightFileBrowser::PreviewQuick
   PRIVATE portal-wayland HolonightQt::Core HolonightQt::Controls)
@@ -71,11 +71,11 @@ qt_add_qml_module(xdg-desktop-portal-holonight URI HolonightPortal VERSION 1.0
 target_link_libraries(xdg-desktop-portal-holonight PRIVATE portal-presentation Qt6::QuickControls2)
 target_compile_options(xdg-desktop-portal-holonight PRIVATE -Wall -Wextra -Wpedantic)
 install(TARGETS xdg-desktop-portal-holonight RUNTIME DESTINATION ${CMAKE_INSTALL_LIBEXECDIR})
-configure_file(packaging/org.freedesktop.impl.portal.desktop.holonight_filechooser.service.in
-  org.freedesktop.impl.portal.desktop.holonight_filechooser.service @ONLY)
-install(FILES ${CMAKE_CURRENT_BINARY_DIR}/org.freedesktop.impl.portal.desktop.holonight_filechooser.service
+configure_file(packaging/org.freedesktop.impl.portal.desktop.holonight.service.in
+  org.freedesktop.impl.portal.desktop.holonight.service @ONLY)
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/org.freedesktop.impl.portal.desktop.holonight.service
   DESTINATION ${CMAKE_INSTALL_DATADIR}/dbus-1/services)
-install(FILES packaging/holonight-filechooser.portal DESTINATION ${CMAKE_INSTALL_DATADIR}/xdg-desktop-portal/portals)
+install(FILES packaging/holonight.portal DESTINATION ${CMAKE_INSTALL_DATADIR}/xdg-desktop-portal/portals)
 install(FILES LICENSE LICENSES/GPL-3.0-or-later.txt DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/${PROJECT_NAME})
 include(CTest)
 if(BUILD_TESTING)

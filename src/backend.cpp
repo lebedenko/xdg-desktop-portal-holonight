@@ -1,5 +1,6 @@
 #include "backend.h"
 
+#include <QDBusMetaType>
 #include <QDBusObjectPath>
 
 namespace Portal {
@@ -41,8 +42,22 @@ void Request::complete(uint response, const QVariantMap& results) {
   backend_->retire(this, response, results);
 }
 Backend::Backend(QDBusConnection connection, Presenter* presenter, QObject* parent)
-    : QDBusVirtualObject(parent), connection_(std::move(connection)), presenter_(presenter) {
+    : QDBusVirtualObject(parent),
+      connection_(std::move(connection)),
+      presenter_(presenter),
+      settings_(appearance_.appearance()) {
   registerWireTypes();
+  qDBusRegisterMetaType<QMap<QString, QVariantMap>>();
+  connect(&appearance_, &Holonight::AppearanceReader::appearanceChanged, this,
+          [this] { settings_.applyAppearance(appearance_.appearance()); });
+  connect(&settings_, &SettingsPortalBackend::SettingChanged, this,
+          [this](const QString& space, const QString& key, const QDBusVariant& value) {
+            if (service_registered_) {
+              auto signal =
+                  QDBusMessage::createSignal(DesktopPath, "org.freedesktop.impl.portal.Settings", "SettingChanged");
+              connection_.send(signal << space << key << QVariant::fromValue(value));
+            }
+          });
   connection_.connect({}, "/org/freedesktop/DBus/Local", "org.freedesktop.DBus.Local", "Disconnected", this,
                       SLOT(connectionLost()));
 }
@@ -50,13 +65,23 @@ void Backend::connectionLost() {
   shutdown();
   emit disconnected();
 }
-Backend::~Backend() {
-  shutdown();
-  connection_.unregisterObject(DesktopPath);
-  connection_.unregisterService(BusName);
-}
+Backend::~Backend() { shutdown(); }
 bool Backend::start() {
-  return connection_.registerVirtualObject(DesktopPath, this) && connection_.registerService(BusName);
+  if (service_registered_) {
+    return true;
+  }
+  if (!connection_.registerVirtualObject(DesktopPath, this)) {
+    return false;
+  }
+  object_registered_ = true;
+  if (!connection_.registerService(BusName)) {
+    connection_.unregisterObject(DesktopPath);
+    object_registered_ = false;
+    return false;
+  }
+  service_registered_ = true;
+  stopping_ = false;
+  return true;
 }
 void Backend::shutdown() {
   stopping_ = true;
@@ -64,6 +89,14 @@ void Backend::shutdown() {
   for (auto* request : requests) {
     request->complete(2, {});
   }
+  if (service_registered_) {
+    connection_.unregisterService(BusName);
+  }
+  if (object_registered_) {
+    connection_.unregisterObject(DesktopPath);
+  }
+  service_registered_ = false;
+  object_registered_ = false;
 }
 QString Backend::introspect(const QString& /*path*/) const {
   QString xml = "<interface name=\"org.freedesktop.impl.portal.FileChooser\">";
@@ -79,9 +112,17 @@ QString Backend::introspect(const QString& /*path*/) const {
             "</method>")
             .arg(method);
   }
-  return xml + "</interface>";
+  return xml + R"(</interface><interface name="org.freedesktop.impl.portal.Settings">
+    <method name="Read"><arg type="s" direction="in"/><arg type="s" direction="in"/>
+    <arg type="v" direction="out"/></method>
+    <method name="ReadAll"><arg type="as" direction="in"/><arg type="a{sa{sv}}" direction="out"/></method>
+    <signal name="SettingChanged"><arg type="s"/><arg type="s"/><arg type="v"/></signal>
+    </interface>)";
 }
 bool Backend::handleMessage(const QDBusMessage& message, const QDBusConnection& connection) {
+  if (message.interface() == "org.freedesktop.impl.portal.Settings") {
+    return settings_.handleMessage(message, connection);
+  }
   if (message.interface() != "org.freedesktop.impl.portal.FileChooser") {
     return false;
   }

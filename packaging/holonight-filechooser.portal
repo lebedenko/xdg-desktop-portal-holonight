@@ -1,4 +1,0 @@
-[portal]
-DBusName=org.freedesktop.impl.portal.desktop.holonight_filechooser
-Interfaces=org.freedesktop.impl.portal.FileChooser;
-UseIn=HoloNight;Hyprland;sway;labwc;

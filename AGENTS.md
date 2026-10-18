@@ -1,7 +1,7 @@
-# HoloNight FileChooser backend
+# HoloNight portal backend
 
-Use English and Conventional Commits. This independent repository owns only the
-FileChooser portal backend. Consume installed providers; do not add provider sources.
+Use English and Conventional Commits. This independent repository owns the standalone
+FileChooser and Settings portal backend. Consume installed providers; do not add provider sources.
 Use C++23, Qt >= 6.11, two-space C++ indentation and qualified QtQuick.Controls imports.
 Keep protocol, lifecycle, controller, validation and native presentation private.
 Native Linux path bytes are authoritative; QString paths are for display only.
