@@ -2,6 +2,13 @@ version: '3'
 vars:
   PRESET: '{{default "dev" .PRESET}}'
 tasks:
+  demo:
+    desc: Launch the development file-picker demo on a private D-Bus session
+    cmds:
+    - task: build
+      vars:
+        PRESET: dev
+    - bash build/dev/native-check.sh --demo
   format-check:
     desc: format-check
     cmds:

@@ -15,12 +15,12 @@ add_test(NAME portal-staged-activation COMMAND ${Python3_EXECUTABLE} ${PROJECT_S
   ${PROJECT_BINARY_DIR} $<TARGET_FILE:portal-tests>)
 set_tests_properties(portal-staged-activation PROPERTIES TIMEOUT 30 ENVIRONMENT
   "QT_QPA_PLATFORM=offscreen;QT_QUICK_BACKEND=software;QML_IMPORT_PATH=${runtime_qml};LD_LIBRARY_PATH=$<TARGET_FILE_DIR:HolonightFileBrowser::Quick>")
-qt_add_executable(portal-native-probe native_probe.cpp)
+qt_add_executable(portal-native-probe native_probe.cpp demo_controller.cpp demo_controller.h)
 set_target_properties(portal-native-probe PROPERTIES QT_QML_MODULE_NO_IMPORT_SCAN TRUE)
 target_include_directories(portal-native-probe PRIVATE ${PROJECT_BINARY_DIR})
 target_link_libraries(portal-native-probe PRIVATE portal-presentation Qt6::GuiPrivate Qt6::QuickControls2 PkgConfig::WaylandClient)
 qt_add_resources(portal-native-probe chooser PREFIX /qt/qml/HolonightPortal BASE ${PROJECT_SOURCE_DIR}/qml
-  FILES ${PROJECT_SOURCE_DIR}/qml/Chooser.qml)
+  FILES ${PROJECT_SOURCE_DIR}/qml/Chooser.qml ${PROJECT_SOURCE_DIR}/qml/Demo.qml)
 foreach(target portal-tests portal-native-probe)
   target_compile_options(${target} PRIVATE -Wall -Wextra -Wpedantic)
 endforeach()
@@ -33,3 +33,18 @@ target_link_libraries(portal-settings-tests PRIVATE portal-core Qt6::Test)
 add_test(NAME portal-settings-tests COMMAND ${DBUS_RUN_SESSION} --config-file=${CMAKE_CURRENT_SOURCE_DIR}/dbus-session.conf
   -- $<TARGET_FILE:portal-settings-tests>)
 set_tests_properties(portal-settings-tests PROPERTIES TIMEOUT 30)
+
+qt_add_executable(portal-demo-tests test_demo.cpp demo_controller.cpp demo_controller.h)
+set_target_properties(portal-demo-tests PROPERTIES QT_QML_MODULE_NO_IMPORT_SCAN TRUE)
+target_link_libraries(portal-demo-tests PRIVATE portal-core Qt6::Test Qt6::Quick Qt6::QuickControls2)
+qt_add_resources(portal-demo-tests demo PREFIX /qt/qml/HolonightPortal BASE ${PROJECT_SOURCE_DIR}/qml
+  FILES ${PROJECT_SOURCE_DIR}/qml/Demo.qml)
+add_test(NAME portal-demo-tests COMMAND ${DBUS_RUN_SESSION} --config-file=${CMAKE_CURRENT_SOURCE_DIR}/dbus-session.conf
+  -- $<TARGET_FILE:portal-demo-tests>)
+set_tests_properties(portal-demo-tests PROPERTIES TIMEOUT 30 ENVIRONMENT
+  "QT_QPA_PLATFORM=offscreen;QT_QUICK_BACKEND=software;QML_IMPORT_PATH=${runtime_qml}")
+
+add_custom_target(portal-demo-qmllint
+  COMMAND Qt6::qmllint ${PROJECT_SOURCE_DIR}/qml/Demo.qml
+  VERBATIM)
+add_dependencies(all_qmllint portal-demo-qmllint)

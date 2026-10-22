@@ -1,4 +1,5 @@
 #include "backend.h"
+#include "demo_controller.h"
 #include "presenter.h"
 #include "xdg-foreign-client.h"
 
@@ -7,6 +8,9 @@
 #include <QDBusPendingReply>
 #include <QDir>
 #include <QGuiApplication>
+#include <QQmlComponent>
+#include <QQmlEngine>
+#include <QQuickItem>
 #include <QQuickStyle>
 #include <QQuickWindow>
 #include <QTimer>
@@ -24,10 +28,12 @@ struct Probe {
   Probe& operator=(const Probe&) = delete;
   Probe(Probe&&) = delete;
   Probe& operator=(Probe&&) = delete;
+  QQmlEngine engine;
   QQuickWindow parent;
   Portal::QmlPresenter presenter;
   QDBusConnection broker = QDBusConnection::connectToBus(QDBusConnection::SessionBus, "native-broker");
   Portal::Backend backend{QDBusConnection::sessionBus(), &presenter};
+  DemoController demo{broker};
   wl_display* display = nullptr;
   wl_event_queue* queue = nullptr;
   wl_display* wrapper = nullptr;
@@ -65,6 +71,11 @@ struct Probe {
     }
   }
   void request(const QString& handle) {
+    if (mode == "--demo") {
+      started = true;
+      demo.ready(handle);
+      return;
+    }
     if (started) {
       return;
     }
@@ -97,24 +108,65 @@ struct Probe {
       watcher->deleteLater();
     });
   }
+  bool showDemo() {
+    QQmlComponent component(&engine, QUrl("qrc:/qt/qml/HolonightPortal/Demo.qml"));
+    auto* view =
+        qobject_cast<QQuickItem*>(component.createWithInitialProperties({{"controller", QVariant::fromValue(&demo)}}));
+    if (view == nullptr) {
+      qWarning() << component.errors();
+      return false;
+    }
+    view->setParent(parent.contentItem());
+    view->setParentItem(parent.contentItem());
+    QObject::connect(&parent, &QQuickWindow::widthChanged, view, [this, view] { view->setWidth(parent.width()); });
+    QObject::connect(&parent, &QQuickWindow::heightChanged, view, [this, view] { view->setHeight(parent.height()); });
+    return true;
+  }
   bool start() {
-    if (!backend.start()) {
+    const bool backendReady = backend.start();
+    if (mode == "--demo") {
+      if (!showDemo()) {
+        return false;
+      }
+      if (!backendReady) {
+        demo.fail("Cannot start local backend; check D-Bus service ownership and stderr.");
+      }
+    } else if (!backendReady) {
       return false;
     }
     parent.setTitle("HoloNight parent probe — close to finish");
     parent.setColor(QColor("#2b2e36"));
-    parent.resize(450, 220);
+    parent.resize(mode == "--demo" ? 800 : 450, mode == "--demo" ? 560 : 220);
     parent.show();
+    if (!backendReady) {
+      return true;
+    }
+    if (mode == "--demo") {
+      parent.setTitle("HoloNight file-picker demo");
+      QTimer::singleShot(1000, &parent, [this] {
+        if (!started) {
+          request({});
+        }
+      });
+    }
+    return exportParent();
+  }
+  bool exportParent() {
     auto* native = qGuiApp->nativeInterface<QNativeInterface::QWaylandApplication>();
     if ((native == nullptr) || (native->display() == nullptr) || mode == "unparented") {
-      request({});
+      if (mode != "--demo") {
+        request({});
+      }
       return true;
     }
     display = native->display();
     queue = wl_display_create_queue(display);
     wrapper = static_cast<wl_display*>(wl_proxy_create_wrapper(display));
     if ((queue == nullptr) || (wrapper == nullptr)) {
-      return false;
+      if (mode != "--demo") {
+        request({});
+      }
+      return true;
     }
     // libwayland exposes displays as proxies through its C object representation.
     // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
@@ -138,7 +190,9 @@ struct Probe {
       self->registry_sync = nullptr;
       if (self->exporter == nullptr) {
         qInfo() << "xdg-foreign export is unavailable; opening an ordinary chooser.";
-        self->request({});
+        if (self->mode != "--demo") {
+          self->request({});
+        }
       }
     }};
     wl_callback_add_listener(registry_sync, &syncListener, this);
