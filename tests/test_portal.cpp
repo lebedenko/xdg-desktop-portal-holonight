@@ -14,6 +14,7 @@
 #include <QQuickStyle>
 #include <QQuickWindow>
 #include <QRegularExpression>
+#include <QScopeGuard>
 #include <QScreen>
 #include <QSignalSpy>
 #include <QTemporaryDir>
@@ -52,6 +53,17 @@ int findRow(Controller& controller, const QString& name) {
     }
   }
   return -1;
+}
+QQuickItem* findNamedItem(QQuickItem* parent, const QString& name) {
+  if (parent->objectName() == name) {
+    return parent;
+  }
+  for (auto* child : parent->childItems()) {
+    if (auto* item = findNamedItem(child, name)) {
+      return item;
+    }
+  }
+  return nullptr;
 }
 QQuickItem* findEntry(QQuickItem* parent, const QString& title) {
   if (parent->property("title").toString() == title) {
@@ -535,6 +547,53 @@ class PortalTests : public QObject {
     QCOMPARE(controller.location(), chosen.path());
     QCOMPARE(controller.filename(), "chosen");
   }
+  void navigationHistoryPreservesNativePathsAndBranches() {
+    QTemporaryDir temp;
+    const auto base = QFile::encodeName(temp.path());
+    const auto native = joinPath(base, QByteArray("native-\xff"));
+    QVERIFY(::mkdir(native.constData(), 0700) == 0);
+    QVERIFY(QDir(temp.path()).mkdir("other"));
+    writeFile(joinPath(native, "a"));
+    auto options = folderOptions(base);
+    options.directory = true;
+    Controller controller(options);
+    QTRY_VERIFY(!controller.busy());
+    QVERIFY(!controller.canGoBack() && !controller.canGoForward());
+    controller.navigateNative(native);
+    QTRY_VERIFY(!controller.busy());
+    QVERIFY(controller.canGoBack());
+    controller.goBack();
+    QTRY_VERIFY(!controller.busy());
+    QCOMPARE(controller.location(), temp.path());
+    QVERIFY(!controller.canGoBack() && controller.canGoForward());
+    controller.goForward();
+    QTRY_VERIFY(!controller.busy());
+    QVERIFY(findRow(controller, "a") >= 0);
+    QSignalSpy completed(&controller, &Controller::completed);
+    controller.accept();
+    QTRY_COMPARE(completed.size(), 1);
+    QCOMPARE(completed.first().at(1).toMap().value("uris").toStringList(), QStringList{localUri(native)});
+
+    Controller branch(folderOptions(base));
+    QTRY_VERIFY(!branch.busy());
+    branch.navigateNative(native);
+    QTRY_VERIFY(!branch.busy());
+    branch.goBack();
+    QTRY_VERIFY(!branch.busy());
+    branch.navigateNative(base);
+    QVERIFY(branch.canGoForward());
+    branch.navigateNative(joinPath(base, "other"));
+    QTRY_VERIFY(!branch.busy());
+    QVERIFY(!branch.canGoForward());
+    branch.goForward();
+    QCOMPARE(branch.location(), temp.filePath("other"));
+    branch.navigate("relative");
+    branch.goBack();
+    QTRY_VERIFY(!branch.busy());
+    QCOMPARE(branch.location(), temp.path());
+    QVERIFY(!branch.canGoBack());
+  }
+
   void nonUtf8FolderLocationRoundTrip() {
     QTemporaryDir temp;
     const auto folder = QFile::encodeName(temp.path()) + "/folder" + static_cast<char>(0xff);
@@ -897,10 +956,149 @@ class PortalTests : public QObject {
     QTRY_VERIFY(preview->isVisible());
     window->resize(800, 400);
     QTRY_VERIFY(!preview->isVisible() && toggle->isVisible());
+    controller.select(findRow(controller, "image.png"));
+    const auto cursor = controller.cursor();
     const auto selection = controller.selectedIds();
     QVERIFY(QMetaObject::invokeMethod(toggle, "clicked"));
     QTRY_VERIFY(preview->isVisible());
     QCOMPARE(controller.selectedIds(), selection);
+    auto* drawer = window->findChild<QObject*>("previewDrawer");
+    QVERIFY(drawer);
+    QTRY_VERIFY(drawer->property("opened").toBool());
+    QTest::keyClick(window, Qt::Key_Escape);
+    QTRY_VERIFY(!preview->isVisible());
+    QVERIFY(window->isVisible());
+    QVERIFY(QMetaObject::invokeMethod(toggle, "clicked"));
+    QTRY_VERIFY(preview->isVisible());
+    window->resize(1000, 400);
+    QTRY_VERIFY(window->property("wide").toBool());
+    QTRY_VERIFY(preview->isVisible());
+    window->resize(800, 400);
+    QTRY_VERIFY(!window->property("wide").toBool());
+    QTRY_VERIFY(!preview->isVisible());
+    QCOMPARE(controller.cursor(), cursor);
+    QCOMPARE(controller.selectedIds(), selection);
+    presenter.close(&controller);
+    QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
+  }
+
+  void additionalOptionsRemainScrollableAndPersist() {
+    QTemporaryDir dir;
+    auto options = folderOptions(QFile::encodeName(dir.path()));
+    options.multiple = true;
+    for (int index = 0; index < 30; ++index) {
+      options.choices.append({.id = QString::number(index),
+                              .label = QString("A long caller option label ").repeated(8),
+                              .values = {},
+                              .selected = "false"});
+    }
+    QmlPresenter presenter;
+    Controller controller(options);
+    QVERIFY(presenter.show(&controller, options));
+    QTRY_VERIFY(!controller.busy());
+    QQuickWindow* window = nullptr;
+    for (auto* candidate : QGuiApplication::topLevelWindows()) {
+      if (candidate->isVisible()) {
+        window = qobject_cast<QQuickWindow*>(candidate);
+      }
+    }
+    QVERIFY(window);
+    window->resize(600, 400);
+    auto* toggle = window->findChild<QQuickItem*>("optionsToggle");
+    auto* popup = window->findChild<QObject*>("optionsPopup");
+    auto* scroll = window->findChild<QQuickItem*>("optionsScroll");
+    QVERIFY(toggle && popup && scroll);
+    QVERIFY(QMetaObject::invokeMethod(toggle, "clicked"));
+    QTRY_VERIFY(popup->property("visible").toBool());
+    QTRY_VERIFY(scroll->property("contentHeight").toReal() > scroll->height());
+    auto* popupContent = qvariant_cast<QQuickItem*>(popup->property("contentItem"));
+    QVERIFY(popupContent);
+    auto* choice = findNamedItem(popupContent, "choice-0");
+    QVERIFY(choice);
+    choice->setProperty("checked", true);
+    QVERIFY(QMetaObject::invokeMethod(choice, "clicked"));
+    QCOMPARE(controller.choices().first().toMap().value("selected").toString(), QString("true"));
+    QTest::keyClick(window, Qt::Key_Escape);
+    QTRY_VERIFY(!popup->property("visible").toBool());
+    QVERIFY(window->isVisible());
+    QVERIFY(QMetaObject::invokeMethod(toggle, "clicked"));
+    QTRY_VERIFY(popup->property("visible").toBool());
+    choice = findNamedItem(popupContent, "choice-0");
+    QVERIFY(choice);
+    QVERIFY(choice->property("checked").toBool());
+    auto* flickable = qvariant_cast<QQuickItem*>(scroll->property("contentItem"));
+    QVERIFY(flickable);
+    flickable->setProperty("contentY", scroll->property("contentHeight").toReal() - scroll->height());
+    auto* last = findNamedItem(popupContent, "choice-29");
+    QVERIFY(last);
+    QTRY_VERIFY(last->mapToScene(QPointF()).y() < window->height());
+    last->setProperty("checked", true);
+    QVERIFY(QMetaObject::invokeMethod(last, "clicked"));
+    QCOMPARE(controller.choices().last().toMap().value("selected").toString(), QString("true"));
+    auto* accept = window->findChild<QQuickItem*>("accept");
+    QVERIFY(accept);
+    QVERIFY(accept->mapToScene(QPointF(accept->width(), accept->height())).x() <= window->width());
+    presenter.close(&controller);
+    QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
+  }
+
+  void placesHighlightOnlyTheCurrentLocation() {
+    QTemporaryDir temp;
+    QTemporaryDir config;
+    QVERIFY(QDir(temp.path()).mkdir("documents"));
+    QFile userDirs(config.filePath("user-dirs.dirs"));
+    QVERIFY(userDirs.open(QIODevice::WriteOnly));
+    QVERIFY(userDirs.write("XDG_DOCUMENTS_DIR=\"" + QFile::encodeName(temp.filePath("documents")) + "\"\n") > 0);
+    userDirs.close();
+    const bool hadConfig = qEnvironmentVariableIsSet("XDG_CONFIG_HOME");
+    const auto previousConfig = qgetenv("XDG_CONFIG_HOME");
+    const auto restoreConfig = qScopeGuard([&] {
+      if (hadConfig) {
+        qputenv("XDG_CONFIG_HOME", previousConfig);
+      } else {
+        qunsetenv("XDG_CONFIG_HOME");
+      }
+    });
+    qputenv("XDG_CONFIG_HOME", QFile::encodeName(config.path()));
+    const auto options = folderOptions(QFile::encodeName(temp.path()));
+    Controller controller(options);
+    QmlPresenter presenter;
+    QVERIFY(presenter.show(&controller, options));
+    QTRY_VERIFY(!controller.busy());
+    QQuickWindow* window = nullptr;
+    for (auto* candidate : QGuiApplication::topLevelWindows()) {
+      if (candidate->isVisible()) {
+        window = qobject_cast<QQuickWindow*>(candidate);
+      }
+    }
+    QVERIFY(window);
+    auto* places = window->findChild<QQuickItem*>("places");
+    QVERIFY(places);
+    const auto entries = controller.places();
+    QVERIFY(entries.size() >= 2);
+    const auto home = entries.at(0).toMap();
+    const auto next = entries.at(1).toMap();
+    QQuickItem* homeDelegate = nullptr;
+    QQuickItem* nextDelegate = nullptr;
+    QTRY_VERIFY((homeDelegate = findEntry(places, home.value("name").toString())));
+    QTRY_VERIFY((nextDelegate = findEntry(places, next.value("name").toString())));
+    QVERIFY(!homeDelegate->property("selected").toBool());
+    QVERIFY(!nextDelegate->property("selected").toBool());
+    QVERIFY(QMetaObject::invokeMethod(homeDelegate, "clicked"));
+    QTRY_COMPARE(controller.location(), home.value("path").toString());
+    QTRY_VERIFY(homeDelegate->property("selected").toBool());
+    QVERIFY(!nextDelegate->property("selected").toBool());
+    QVERIFY(QMetaObject::invokeMethod(nextDelegate, "clicked"));
+    QTRY_COMPARE(controller.location(), next.value("path").toString());
+    QTRY_VERIFY(!homeDelegate->property("selected").toBool());
+    QTRY_VERIFY(nextDelegate->property("selected").toBool());
+    controller.goBack();
+    QTRY_COMPARE(controller.location(), home.value("path").toString());
+    QTRY_VERIFY(homeDelegate->property("selected").toBool());
+    QVERIFY(!nextDelegate->property("selected").toBool());
+    controller.navigate(temp.path());
+    QTRY_VERIFY(!homeDelegate->property("selected").toBool());
+    QVERIFY(!nextDelegate->property("selected").toBool());
     presenter.close(&controller);
     QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
   }
@@ -940,6 +1138,17 @@ class PortalTests : public QObject {
     QVERIFY(QMetaObject::invokeMethod(accept, "clicked"));
     QTRY_COMPARE(controller.location(), temp.filePath("child"));
     QTRY_VERIFY(!controller.busy());
+    auto* back = window->findChild<QQuickItem*>("historyBack");
+    auto* forward = window->findChild<QQuickItem*>("historyForward");
+    QVERIFY(back && forward);
+    QTRY_VERIFY(back->isEnabled());
+    QVERIFY(QMetaObject::invokeMethod(back, "clicked"));
+    QTRY_COMPARE(controller.location(), temp.path());
+    QTRY_VERIFY(!controller.busy());
+    QTRY_VERIFY(forward->isEnabled());
+    QVERIFY(QMetaObject::invokeMethod(forward, "clicked"));
+    QTRY_COMPARE(controller.location(), temp.filePath("child"));
+    QTRY_VERIFY(!controller.busy());
     QVERIFY(controller.explanation().isEmpty());
     QTRY_VERIFY((entry = findEntry(content, "a")));
     entry->forceActiveFocus();
@@ -968,11 +1177,12 @@ class PortalTests : public QObject {
     QTest::addColumn<bool>("directory");
     QTest::addColumn<bool>("multiple");
     QTest::addColumn<QString>("purposeText");
-    QTest::newRow("OpenFile") << false << false << false << QString("Choose a file");
-    QTest::newRow("OpenFiles") << false << false << true << QString("Choose files");
-    QTest::newRow("OpenFolder") << false << true << false << QString("Choose a folder");
-    QTest::newRow("OpenFolders") << false << true << true << QString("Choose folders");
-    QTest::newRow("SaveFile") << true << false << false << QString("Save a file");
+    QTest::newRow("OpenFile") << false << false << false << QString("Open File");
+    QTest::newRow("OpenFiles") << false << false << true << QString("Open Files");
+    QTest::newRow("OpenFolder") << false << true << false << QString("Select Folder");
+    QTest::newRow("OpenFolders") << false << true << true << QString("Select Folders");
+    QTest::newRow("SaveFile") << true << false << false << QString("Save File");
+    QTest::newRow("SaveFiles") << false << true << false << QString("Save Files");
   }
   void qmlBoundedDialog() {
     QFETCH(bool, save);
@@ -987,6 +1197,10 @@ class PortalTests : public QObject {
     auto options = folderOptions(folder);
     options.directory = directory;
     options.multiple = multiple;
+    options.filters = {{.name = "All files", .patterns = {{.kind = 0, .value = "*"}}}};
+    if (purposeText == "Save Files") {
+      options.operation = Operation::SaveMany;
+    }
     if (save) {
       options.operation = Operation::Save;
       options.name = "new";
@@ -1019,17 +1233,50 @@ class PortalTests : public QObject {
     QCOMPARE(purpose->property("title").toString(), purposeText);
     auto* places = window->findChild<QQuickItem*>("places");
     QVERIFY(places);
-    QVERIFY(places->width() <= 170);
-    for (int height : {limit, window->minimumHeight()}) {
-      window->resize(window->width(), height);
-      for (auto* button : {accept, cancel}) {
-        QTRY_VERIFY(button->isVisible() && button->height() > 0);
-        QTRY_VERIFY(button->mapToScene(QPointF(0, button->height())).y() <= window->height());
+    auto* sidebar = window->findChild<QQuickItem*>("placesPanel");
+    auto* previewDock = window->findChild<QQuickItem*>("previewDock");
+    auto* toolbar = window->findChild<QQuickItem*>("toolbarSurface");
+    QVERIFY(sidebar && previewDock && toolbar);
+    QCOMPARE(sidebar->width(), 220);
+    auto* back = window->findChild<QQuickItem*>("historyBack");
+    auto* forward = window->findChild<QQuickItem*>("historyForward");
+    auto* parentButton = window->findChild<QQuickItem*>("parentFolder");
+    QVERIFY(back && forward && parentButton);
+    QVERIFY(!back->isEnabled() && !forward->isEnabled());
+    QVERIFY(!window->findChild<QQuickItem*>("showHidden"));
+    for (const auto* name : {"purposeSurface", "toolbarSurface", "placesPanel", "previewDock", "footerSurface"}) {
+      QCOMPARE(window->findChild<QQuickItem*>(name)->property("color"), sidebar->property("color"));
+    }
+    QCOMPARE(window->minimumWidth(), 600);
+    for (int width : {1160, 800, 600}) {
+      for (int height : {limit, window->minimumHeight()}) {
+        window->resize(width, height);
+        QTRY_COMPARE(toolbar->mapToScene(QPointF(toolbar->width(), 0)).x(), window->width());
+        QCOMPARE(toolbar->mapToScene(QPointF()).x(), sidebar->width());
+        if (width >= 900) {
+          QTRY_COMPARE(previewDock->width(), sidebar->width());
+          QVERIFY(previewDock->mapToScene(QPointF()).y() >= toolbar->mapToScene(QPointF(0, toolbar->height())).y());
+        }
+        for (auto* button : {accept, cancel}) {
+          QTRY_VERIFY(button->isVisible() && button->height() > 0);
+          QTRY_VERIFY(button->mapToScene(QPointF(0, button->height())).y() <= window->height());
+        }
+        QQuickItem* filter = nullptr;
+        QTRY_VERIFY((filter = window->findChild<QQuickItem*>("filter")) && filter->isVisible());
+        auto* form = window->findChild<QQuickItem*>("browserForm");
+        QVERIFY(form);
+        if (save || width < 900) {
+          QTRY_VERIFY(form->isVisible());
+          QVERIFY(filter->mapToScene(QPointF()).y() >= listing->mapToScene(QPointF(0, listing->height())).y());
+        } else {
+          QTRY_VERIFY(!form->isVisible());
+          QVERIFY(filter->mapToScene(QPointF()).y() >= accept->mapToScene(QPointF()).y() - 8);
+        }
+        QTRY_VERIFY(listing->height() > 0);
+        QTRY_VERIFY(listing->property("contentHeight").toReal() > listing->height());
+        QVERIFY(QMetaObject::invokeMethod(listing, "positionViewAtEnd"));
+        QTRY_VERIFY(listing->property("contentY").toReal() > 0);
       }
-      QTRY_VERIFY(listing->height() > 0);
-      QTRY_VERIFY(listing->property("contentHeight").toReal() > listing->height());
-      QVERIFY(QMetaObject::invokeMethod(listing, "positionViewAtEnd"));
-      QTRY_VERIFY(listing->property("contentY").toReal() > 0);
     }
     presenter.close(&controller);
     QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
@@ -1053,15 +1300,14 @@ class PortalTests : public QObject {
       }
     }
     QVERIFY(window);
-    auto* showHidden = window->findChild<QQuickItem*>("showHidden");
-    QVERIFY(showHidden);
+    QVERIFY(!window->findChild<QQuickItem*>("showHidden"));
     QCOMPARE(findRow(controller, ".hidden"), -1);
-    QVERIFY(showHidden->setProperty("checked", true));
-    QVERIFY(QMetaObject::invokeMethod(showHidden, "clicked"));
+    window->findChild<QQuickItem*>("listing")->forceActiveFocus();
+    QTest::keyClick(window, Qt::Key_H, Qt::ControlModifier);
     QTRY_VERIFY(findRow(controller, ".hidden") >= 0);
     QTest::keyClick(window, Qt::Key_H, Qt::ControlModifier);
     QTRY_COMPARE(findRow(controller, ".hidden"), -1);
-    QVERIFY(!showHidden->property("checked").toBool());
+    QVERIFY(!controller.hiddenVisible());
     auto* listing = window->findChild<QQuickItem*>("listing");
     QVERIFY(listing);
     controller.setCursor(findRow(controller, "a"));

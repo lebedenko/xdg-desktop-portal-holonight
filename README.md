@@ -81,7 +81,7 @@ The offscreen regression suite exercises keyboard input in an isolated fixture.
 
 Keyboard: j/k move the cursor, h goes up, l enters a folder, / focuses folder search,
 Ctrl+L focuses location, Space toggles selection, Enter enters a cursor folder or accepts
-files. Ctrl+H or Show hidden files toggles dotfiles and hidden folders.
+files. Ctrl+H toggles dotfiles and hidden folders.
 In single-selection mode, clicking an entry or moving with j/k selects it; activating a
 file replaces any previous selection. The accept button uses the selected folder, including
 for SaveFiles, or the current folder if none is selected.
@@ -91,6 +91,17 @@ SaveFile focuses its filename. Multi-selection is explicit and survives filterin
 navigation clears it. SaveFile requires overwrite confirmation; SaveFiles numbers collisions
 in input order. Neither operation creates or reserves a destination.
 
-No history, recursive search, previews, thumbnails, bookmarks, devices, X11 parenting or
+The picker uses adjoining themed panels with a purpose heading for each of the six
+modes. Both sidebars use Files’ 220-pixel width and themed surfaces. Back, Forward,
+and Up appear in the toolbar above the listing and preview; navigation history is
+local to each request and preserves native path bytes. At 900 pixels and wider, a 220-pixel preview is docked beside the listing;
+on narrower windows, Show preview opens a dismissible drawer. Escape dismisses
+the preview or Additional options before cancelling the request. Caller options
+scroll in that popup and retain their values when it closes. Save File fields sit
+below the listing; open-mode file types move there on narrow windows. Validation
+messages scroll above the fixed Cancel and caller-provided accept actions.
+See the [layout design](docs/sdd/picker-layout/DESIGN.md).
+
+No recursive search, thumbnail browsing, bookmarks, devices, X11 parenting or
 additional portal interfaces. Compositor and real-broker document-access acceptance are
 recorded separately from local automated verification in the [SDD](docs/sdd/filechooser/README.md).

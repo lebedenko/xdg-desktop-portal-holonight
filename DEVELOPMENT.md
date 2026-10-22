@@ -37,7 +37,12 @@ The demo starts in the home directory. Save operations return destination URIs
 without creating files. Close the demo window to shut down pending requests and
 the local backend.
 
-Manual acceptance: open and close each picker, accept and cancel selections,
+Manual acceptance: inspect Open File, Open Files, Select Folder, Select Folders,
+Save File and Save Files. Repeat at widths above and below 900 pixels, down to 600.
+Check docked preview versus Show preview drawer, Escape dismissal and unchanged
+selection after resizing. Check save fields, file types, Additional options with
+long labels, and scrolling validation while both action buttons remain reachable.
+Open and close each picker, accept and cancel selections,
 and check multiple returned URIs in the log. Verify Wayland parenting and modality;
 export falls back to an unparented chooser after one second. Repeat requests to
 fill the log, select and copy text, scroll upward while another result arrives,

@@ -52,9 +52,12 @@ class Controller : public QObject {
   Q_PROPERTY(QString explanation READ explanation NOTIFY changed)
   Q_PROPERTY(bool busy READ busy NOTIFY changed)
   Q_PROPERTY(bool overwritePending READ overwritePending NOTIFY changed)
+  Q_PROPERTY(bool canGoBack READ canGoBack NOTIFY locationChanged)
+  Q_PROPERTY(bool canGoForward READ canGoForward NOTIFY locationChanged)
   Q_PROPERTY(bool multiple READ multiple CONSTANT)
   Q_PROPERTY(bool directoryMode READ directoryMode CONSTANT)
   Q_PROPERTY(bool save READ save CONSTANT)
+  Q_PROPERTY(bool saveMany READ saveMany CONSTANT)
   Q_PROPERTY(bool hiddenVisible READ hiddenVisible WRITE setHiddenVisible NOTIFY hiddenVisibleChanged)
   Q_PROPERTY(QString title READ title CONSTANT)
   Q_PROPERTY(QString acceptLabel READ acceptLabel CONSTANT)
@@ -81,8 +84,13 @@ class Controller : public QObject {
   [[nodiscard]] QString explanation() const { return explanation_; }
   [[nodiscard]] bool busy() const { return validating_ || initializing_ || reader_->scanning(); }
   [[nodiscard]] bool overwritePending() const { return overwrite_pending_; }
+  [[nodiscard]] bool canGoBack() const { return history_index_ > 0; }
+  [[nodiscard]] bool canGoForward() const { return history_index_ + 1 < history_.size(); }
+  Q_INVOKABLE void goBack();
+  Q_INVOKABLE void goForward();
   [[nodiscard]] bool multiple() const { return options_.multiple; }
   [[nodiscard]] bool directoryMode() const { return options_.directory; }
+  [[nodiscard]] bool saveMany() const { return options_.operation == Operation::SaveMany; }
   [[nodiscard]] bool save() const { return options_.operation == Operation::Save; }
   [[nodiscard]] bool hiddenVisible() const { return sorted_.hiddenVisible(); }
   [[nodiscard]] QString title() const { return options_.title; }
@@ -127,6 +135,7 @@ class Controller : public QObject {
  private:
   [[nodiscard]] QByteArray rowPath(int row) const;
   [[nodiscard]] bool selectable(int row) const;
+  void navigateTo(const QByteArray& path, bool recordHistory);
   void syncPreview();
   void initializeLocation();
   void refreshSearch();
@@ -139,6 +148,8 @@ class Controller : public QObject {
   HolonightFileBrowser::DirectoryReader* reader_;
   DirectoryProxyModel sorted_;
   EntryFilter filter_;
+  QList<QByteArray> history_;
+  int history_index_ = -1;
   QByteArray folder_;
   QByteArray filename_;
   HolonightFileBrowser::Selection selection_;

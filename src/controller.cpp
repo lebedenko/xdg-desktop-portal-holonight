@@ -280,11 +280,29 @@ void Controller::setHiddenVisible(bool visible) { sorted_.setHiddenVisible(visib
 void Controller::navigate(const QString& path) {
   navigateNative(path == location() ? folder_ : QFile::encodeName(path));
 }
-void Controller::navigateNative(const QByteArray& path) {
+void Controller::goBack() {
+  if (!stopped_ && canGoBack()) {
+    --history_index_;
+    navigateTo(history_.at(history_index_), false);
+  }
+}
+void Controller::goForward() {
+  if (!stopped_ && canGoForward()) {
+    ++history_index_;
+    navigateTo(history_.at(history_index_), false);
+  }
+}
+void Controller::navigateNative(const QByteArray& path) { navigateTo(path, true); }
+void Controller::navigateTo(const QByteArray& path, bool recordHistory) {
   if (stopped_ || !absolutePath(path)) {
     explanation_ = "Enter an absolute local path.";
     emit changed();
     return;
+  }
+  if (recordHistory && (history_index_ < 0 || history_.at(history_index_) != path)) {
+    history_.resize(history_index_ + 1);
+    history_.append(path);
+    history_index_ = static_cast<int>(history_.size()) - 1;
   }
   navigating_ = true;
   preview_->clear();
