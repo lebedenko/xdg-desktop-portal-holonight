@@ -21,7 +21,7 @@
   },
   {
     "name": "holonight-file-browser",
-    "revision": "6009e59cdf8d685ee818d92564ce64ea0f838896",
+    "revision": "24eb8e7211339d70c507a23497a0e3624a6e2d7d",
     "options": [
       "-DBUILD_FILE_BROWSER_STORAGE=OFF",
       "-DBUILD_FILE_BROWSER_MARKDOWN=OFF"

@@ -277,7 +277,6 @@ HnApplicationWindow {
                                     required property int index
                                     required property string name
                                     required property bool isDir
-                                    required property bool isParent
                                     required property bool statFailed
                                     required property string statError
                                     required property string nativeId
@@ -289,11 +288,11 @@ HnApplicationWindow {
                                     title: name
                                     filename: name
                                     sizeText: isDir ? "" : Number(size).toLocaleString(Qt.locale())
-                                    modifiedText: isParent ? "" : modified.toLocaleString(Qt.locale(), Locale.ShortFormat)
+                                    modifiedText: modified.toLocaleString(Qt.locale(), Locale.ShortFormat)
                                     highlighted: index === root.controller.cursor || root.controller.selectedIds.indexOf(nativeId) >= 0
                                     selectionContent: Controls.CheckBox {
                                         objectName: "selection-" + entry.nativeId
-                                        enabled: !entry.isParent && !entry.statFailed && entry.isDir === root.controller.directoryMode
+                                        enabled: !entry.statFailed && entry.isDir === root.controller.directoryMode
                                         checked: root.controller.selectedIds.indexOf(entry.nativeId) >= 0
                                         Accessible.name: qsTr("Select %1").arg(entry.name)
                                         onClicked: {

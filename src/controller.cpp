@@ -339,7 +339,7 @@ void Controller::syncPreview() {
     return;
   }
   const auto index = filter_.index(cursor_, 0);
-  if (!index.isValid() || index.data(DirectoryRoles::IsParentRole).toBool()) {
+  if (!index.isValid()) {
     preview_->clear();
     return;
   }
@@ -358,8 +358,7 @@ QByteArray Controller::rowPath(int row) const {
 }
 bool Controller::selectable(int row) const {
   auto index = filter_.index(row, 0);
-  return index.isValid() && !index.data(DirectoryRoles::IsParentRole).toBool() &&
-         !index.data(DirectoryRoles::StatFailedRole).toBool() &&
+  return index.isValid() && !index.data(DirectoryRoles::StatFailedRole).toBool() &&
          (options_.directory == index.data(DirectoryRoles::IsDirRole).toBool());
 }
 void Controller::select(int row) {

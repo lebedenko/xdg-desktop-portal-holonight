@@ -331,6 +331,46 @@ class PortalTests : public QObject {
     }
     QVERIFY(!validate(Operation::Save, false, {folder + "/missing/file"}, {}, token).error.isEmpty());
   }
+  void childOnlyListingsAndParentNavigation() {
+    QTemporaryDir temp;
+    const auto folder = QFile::encodeName(temp.path());
+    QVERIFY(QDir(temp.path()).mkdir("empty"));
+    for (int mode = 0; mode < 3; ++mode) {
+      auto options = folderOptions(joinPath(folder, "empty"));
+      options.operation = mode == 1 ? Operation::Save : Operation::Open;
+      options.directory = mode == 2;
+      QmlPresenter presenter;
+      Controller controller(options);
+      QVERIFY(presenter.show(&controller, options));
+      QTRY_VERIFY(!controller.busy());
+      QCOMPARE(controller.entries()->rowCount(), 0);
+      QCOMPARE(findRow(controller, ".."), -1);
+      QQuickWindow* window = nullptr;
+      for (auto* candidate : QGuiApplication::topLevelWindows()) {
+        if (candidate->isVisible()) {
+          window = qobject_cast<QQuickWindow*>(candidate);
+        }
+      }
+      QVERIFY(window);
+      auto* listing = window->findChild<QQuickItem*>("listing");
+      auto* parentButton = window->findChild<QQuickItem*>("parentFolder");
+      QVERIFY(listing && parentButton);
+      QVERIFY(QMetaObject::invokeMethod(parentButton, "clicked"));
+      QTRY_VERIFY(!controller.busy());
+      QVERIFY(findRow(controller, "empty") >= 0);
+      QCOMPARE(findRow(controller, ".."), -1);
+      controller.activate(findRow(controller, "empty"));
+      QTRY_VERIFY(!controller.busy());
+      QCOMPARE(controller.entries()->rowCount(), 0);
+      listing->forceActiveFocus();
+      QTest::keyClick(window, Qt::Key_Left);
+      QTRY_VERIFY(!controller.busy());
+      QVERIFY(findRow(controller, "empty") >= 0);
+      QCOMPARE(findRow(controller, ".."), -1);
+      presenter.close(&controller);
+      QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
+    }
+  }
   void selectionAndFiltering() {
     QTemporaryDir temp;
     const auto folder = QFile::encodeName(temp.path());
@@ -915,6 +955,7 @@ class PortalTests : public QObject {
 
   void previewRetiresAfterRequestDestruction() {
     QTemporaryDir dir;
+    QVERIFY(QDir(dir.path()).mkdir("initial"));
     QImage image(32, 16, QImage::Format_RGB32);
     image.fill(Qt::blue);
     QVERIFY(image.save(dir.filePath("pending.png")));
