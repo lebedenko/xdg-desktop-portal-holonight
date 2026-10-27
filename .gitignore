@@ -2,9 +2,7 @@
 /.cache/
 
 /compile_commands.json
-/.serena/cache/
-/.serena/memories/
-/.serena/project.local.yml
+/.serena/
 
 __pycache__/
 *.pyc
