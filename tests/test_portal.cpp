@@ -1195,7 +1195,7 @@ class PortalTests : public QObject {
     entry->forceActiveFocus();
     QVERIFY(QMetaObject::invokeMethod(entry, "clicked"));
     QTRY_VERIFY(listing->hasActiveFocus());
-    QTest::keyClick(window, Qt::Key_J);
+    QTest::keyClick(window, Qt::Key_Down);
     QCOMPARE(controller.cursor(), findRow(controller, "b"));
     presenter.close(&controller);
     QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
@@ -1322,6 +1322,79 @@ class PortalTests : public QObject {
     presenter.close(&controller);
     QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
   }
+  void sharedNavigationProfiles_data() {
+    QTest::addColumn<bool>("vim");
+    QTest::newRow("standard") << false;
+    QTest::newRow("vim-navigation") << true;
+  }
+  void sharedNavigationProfiles() {
+    QFETCH(bool, vim);
+    QTemporaryDir config;
+    const auto previous = qgetenv("XDG_CONFIG_HOME");
+    const auto restore = qScopeGuard([&] {
+      if (previous.isNull())
+        qunsetenv("XDG_CONFIG_HOME");
+      else
+        qputenv("XDG_CONFIG_HOME", previous);
+    });
+    qputenv("XDG_CONFIG_HOME", QFile::encodeName(config.path()));
+    QDir().mkpath(config.filePath("holonight"));
+    QFile preferences(config.filePath("holonight/input.toml"));
+    QVERIFY(preferences.open(QIODevice::WriteOnly));
+    preferences.write(vim ? "version = 1\nprofile = 'vim-navigation'\n" : "version = 1\nprofile = 'standard'\n");
+    preferences.close();
+    QTemporaryDir temp;
+    const auto folder = QFile::encodeName(temp.path());
+    for (const auto* name : {"a", "b", "c"}) writeFile(joinPath(folder, name));
+    auto options = folderOptions(folder);
+    options.multiple = true;
+    Controller controller(options);
+    QmlPresenter presenter;
+    QVERIFY(presenter.show(&controller, options));
+    QTRY_VERIFY(!controller.busy());
+    QQuickWindow* window = nullptr;
+    for (auto* candidate : QGuiApplication::topLevelWindows())
+      if (candidate->isVisible()) window = qobject_cast<QQuickWindow*>(candidate);
+    QVERIFY(window);
+    auto* listing = window->findChild<QQuickItem*>("listing");
+    QVERIFY(listing);
+    listing->forceActiveFocus();
+    controller.setCursor(0);
+    QTest::keyClick(window, Qt::Key_J);
+    QCOMPARE(controller.cursor(), vim ? 1 : 0);
+    QTest::keyClick(window, Qt::Key_End);
+    QCOMPARE(controller.cursor(), 2);
+    QTest::keyClick(window, Qt::Key_Down);
+    QCOMPARE(controller.cursor(), 2);
+    QTest::keyClick(window, Qt::Key_Home);
+    QCOMPARE(controller.cursor(), 0);
+    QTest::keyClick(window, Qt::Key_J, Qt::AltModifier);
+    QCOMPARE(controller.cursor(), 0);
+    if (vim) {
+      QTest::keyClick(window, Qt::Key_2);
+      QTest::keyClick(window, Qt::Key_J);
+      QCOMPARE(controller.cursor(), 2);
+      QTest::keyClick(window, Qt::Key_G);
+      QTest::keyClick(window, Qt::Key_G);
+      QCOMPARE(controller.cursor(), 0);
+    }
+    QTest::keyClick(window, Qt::Key_Space);
+    const auto selected = controller.selectedIds();
+    QTest::keyClick(window, Qt::Key_Down);
+    QCOMPARE(controller.selectedIds(), selected);
+    QTest::keyClick(window, Qt::Key_D, Qt::AltModifier);
+    auto* location = window->findChild<QQuickItem*>("location");
+    QTRY_VERIFY(location->hasActiveFocus());
+    const int cursor = controller.cursor();
+    QTest::keyClick(window, Qt::Key_J);
+    QCOMPARE(controller.cursor(), cursor);
+    QSignalSpy finished(&controller, &Controller::completed);
+    QTest::keyClick(window, Qt::Key_Escape);
+    QTRY_COMPARE(finished.size(), 1);
+    presenter.close(&controller);
+    QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
+  }
+
   void qmlKeyboardAndFilenameFocus() {
     QTemporaryDir temp;
     const auto folder = QFile::encodeName(temp.path());
@@ -1362,7 +1435,7 @@ class PortalTests : public QObject {
     clickedEntry->forceActiveFocus();
     QVERIFY(QMetaObject::invokeMethod(clickedEntry, "clicked"));
     QTRY_VERIFY(listing->hasActiveFocus());
-    QTest::keyClick(window, Qt::Key_J);
+    QTest::keyClick(window, Qt::Key_Down);
     QCOMPARE(controller.cursor(), findRow(controller, "b"));
     controller.setCursor(findRow(controller, "a"));
     QTest::keyClick(window, Qt::Key_Space);
@@ -1371,7 +1444,7 @@ class PortalTests : public QObject {
     controller.select(findRow(controller, "b"));
     QCOMPARE(controller.selectedIds(), selection);
     controller.setCursor(findRow(controller, "a"));
-    QTest::keyClick(window, Qt::Key_J);
+    QTest::keyClick(window, Qt::Key_Down);
     QCOMPARE(controller.selectedIds(), selection);
     QCOMPARE(controller.cursor(), findRow(controller, "b"));
     QTest::keyClick(window, Qt::Key_L, Qt::ControlModifier);

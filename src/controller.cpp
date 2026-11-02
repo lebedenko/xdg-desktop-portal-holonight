@@ -104,14 +104,14 @@ Controller::Controller(Options options, QObject* parent)
   });
   connect(reader_, &QAbstractItemModel::rowsInserted, this, [this] { refreshSearch(); });
   connect(reader_, &QAbstractItemModel::modelReset, this, [this] { refreshSearch(); });
-  connect(&filter_, &QAbstractItemModel::modelReset, this, [this] { setCursor(cursor_); });
-  connect(&filter_, &QAbstractItemModel::rowsRemoved, this, [this] { setCursor(cursor_); });
-  connect(&filter_, &QAbstractItemModel::rowsInserted, this, [this] { syncPreview(); });
+  connect(&filter_, &QAbstractItemModel::modelReset, this, [this] { reconcileCursor(); });
+  connect(&filter_, &QAbstractItemModel::rowsRemoved, this, [this] { reconcileCursor(); });
+  connect(&filter_, &QAbstractItemModel::rowsInserted, this, &Controller::reconcileCursor);
   connect(&filter_, &QAbstractItemModel::dataChanged, this, [this] {
     ++preview_revision_;
     syncPreview();
   });
-  connect(&filter_, &QAbstractItemModel::layoutChanged, this, [this] { syncPreview(); });
+  connect(&filter_, &QAbstractItemModel::layoutChanged, this, &Controller::reconcileCursor);
   if (!options_.filters.isEmpty()) {
     int index = static_cast<int>(options_.filters.indexOf(options_.current_filter));
     setFilterIndex(index < 0 ? 0 : index);
@@ -261,8 +261,16 @@ void Controller::setFilename(const QString& value) {
   emit filenameChanged();
   emit changed();
 }
+void Controller::reconcileCursor() {
+  QVector<QByteArray> ids;
+  ids.reserve(filter_.rowCount());
+  for (int row = 0; row < filter_.rowCount(); ++row) ids.append(rowPath(row));
+  cursor_.reconcile(std::move(ids));
+  syncPreview();
+  emit cursorChanged();
+}
 void Controller::setCursor(int value) {
-  cursor_ = std::clamp(value, 0, std::max(0, filter_.rowCount() - 1));
+  cursor_.setIndex(value);
   syncPreview();
   emit cursorChanged();
 }
@@ -312,7 +320,7 @@ void Controller::navigateTo(const QByteArray& path, bool recordHistory) {
   breadcrumbs_.setPath(folder_);
   ++navigation_generation_;
   selection_.selected.clear();
-  cursor_ = 0;
+  cursor_.clear();
   query_.clear();
   ++search_generation_;
   if (search_cancel_) {
@@ -338,7 +346,7 @@ void Controller::syncPreview() {
   if (stopped_ || navigating_) {
     return;
   }
-  const auto index = filter_.index(cursor_, 0);
+  const auto index = filter_.index(cursor(), 0);
   if (!index.isValid()) {
     preview_->clear();
     return;
@@ -352,7 +360,7 @@ void Controller::syncPreview() {
       preview_revision_, index.data(DirectoryRoles::NameRole).toString(), path);
 }
 void Controller::parentFolder() { navigateNative(parentPath(folder_)); }
-void Controller::move(int delta) { select(std::clamp(cursor_ + delta, 0, std::max(0, filter_.rowCount() - 1))); }
+void Controller::move(int delta) { select(std::clamp(cursor() + delta, 0, std::max(0, filter_.rowCount() - 1))); }
 QByteArray Controller::rowPath(int row) const {
   return filter_.index(row, 0).data(DirectoryRoles::NativePathRole).toByteArray();
 }
@@ -447,7 +455,7 @@ void Controller::refreshSearch() {
     filter_.matches = result.matches;
     filter_.mime_names = result.mime_names;
     filter_.refresh();
-    setCursor(cursor_);
+    reconcileCursor();
   });
   watcher->setFuture(QtConcurrent::run([records = std::move(records), query = query_, token, mimeNeeded] {
     return searchFolder(records, query, token, mimeNeeded);
@@ -456,7 +464,7 @@ void Controller::refreshSearch() {
 void Controller::accept() {
   if (!busy() && options_.operation == Operation::Open && !options_.directory && selection_.selected.isEmpty() &&
       cursorIsDirectory()) {
-    activate(cursor_);
+    activate(cursor());
     return;
   }
   startValidation(false);
@@ -479,8 +487,8 @@ void Controller::startValidation(bool overwriteConfirmed) {
     paths = selection_.selected;
   } else if (options_.directory) {
     paths.append(folder_);
-  } else if (!multiple() && selectable(cursor_)) {
-    paths.append(rowPath(cursor_));
+  } else if (!multiple() && selectable(cursor())) {
+    paths.append(rowPath(cursor()));
   }
   invalidateValidation();
   validating_ = true;

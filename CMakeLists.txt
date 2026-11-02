@@ -59,7 +59,7 @@ target_include_directories(portal-core PUBLIC src)
 target_link_libraries(portal-core PUBLIC HolonightQt::Appearance HolonightQt::ThemeCatalog Qt6::DBus Qt6::Concurrent HolonightFileBrowser::Preview HolonightFileBrowser::Search HolonightSearch::Search)
 add_library(portal-presentation STATIC src/presenter.cpp)
 target_link_libraries(portal-presentation PUBLIC portal-core Qt6::Quick HolonightFileBrowser::Quick HolonightFileBrowser::PreviewQuick
-  PRIVATE portal-wayland HolonightQt::Core HolonightQt::Controls)
+  PRIVATE portal-wayland HolonightQt::Appearance HolonightQt::Core HolonightQt::Controls)
 foreach(target portal-core portal-wayland portal-presentation)
   target_compile_options(${target} PRIVATE -Wall -Wextra -Wpedantic)
 endforeach()

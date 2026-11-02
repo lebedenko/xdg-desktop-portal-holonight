@@ -10,6 +10,7 @@
 #include <HolonightFileBrowser/directory_reader.h>
 #include <HolonightFileBrowser/preview/preview_service.h>
 #include <HolonightFileBrowser/selection.h>
+#include <holonight/navigation.h>
 
 namespace Portal {
 class EntryFilter : public QSortFilterProxyModel {
@@ -95,7 +96,7 @@ class Controller : public QObject {
   [[nodiscard]] bool hiddenVisible() const { return sorted_.hiddenVisible(); }
   [[nodiscard]] QString title() const { return options_.title; }
   [[nodiscard]] QString acceptLabel() const { return options_.accept_label; }
-  [[nodiscard]] int cursor() const { return cursor_; }
+  [[nodiscard]] int cursor() const { return cursor_.index(); }
   [[nodiscard]] QStringList selectedIds() const;
   [[nodiscard]] QVariantList places() const { return places_; }
   [[nodiscard]] QStringList filterNames() const;
@@ -106,7 +107,7 @@ class Controller : public QObject {
   void setFilterIndex(int value);
   void setHiddenVisible(bool visible);
   Q_INVOKABLE [[nodiscard]] bool cursorIsDirectory() const {
-    return filter_.index(cursor_, 0).data(DirectoryRoles::IsDirRole).toBool();
+    return filter_.index(cursor(), 0).data(DirectoryRoles::IsDirRole).toBool();
   }
   Q_INVOKABLE void setChoice(int index, const QString& identifier);
   Q_INVOKABLE void navigate(const QString& path);
@@ -156,7 +157,8 @@ class Controller : public QObject {
   QVariantList places_;
   QString explanation_;
   QString query_;
-  int cursor_ = 0;
+  Holonight::NavigationCursor cursor_;
+  void reconcileCursor();
   int filter_index_ = -1;
   quint64 search_generation_ = 0;
   quint64 validation_generation_ = 0;

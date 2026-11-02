@@ -15,6 +15,25 @@ HnApplicationWindow {
     readonly property int heightLimit: Math.max(1, Math.min(600, Screen.desktopAvailableHeight - 48))
     flags: Qt.Dialog
     property bool editingLocation: false
+    readonly property bool modalActive: controller.overwritePending || optionsPopup.visible
+    HnNavigation {
+        id: navigation
+        active: listing.activeFocus && !(root.activeFocusItem instanceof Controls.CheckBox) && !root.modalActive
+        vimNavigation: HnInputPreferences.vimNavigation
+    }
+    HnNavigation {
+        id: placesNavigation
+        active: places.activeFocus && !root.modalActive
+        vimNavigation: HnInputPreferences.vimNavigation
+    }
+    function panelFocus(command: int): void {
+        if (command === HnNavigation.PanelLeft)
+            places.forceActiveFocus(Qt.TabFocusReason);
+        else if (command === HnNavigation.PanelRight || command === HnNavigation.PanelDown)
+            listing.forceActiveFocus(Qt.TabFocusReason);
+        else if (command === HnNavigation.PanelUp)
+            breadcrumbs.forceActiveFocus(Qt.TabFocusReason);
+    }
     readonly property int sidebarWidth: 220
     readonly property real panelInset: HnMetrics.internalSpacing(HnControlSize.Normal)
     readonly property bool wide: width >= 900
@@ -104,6 +123,29 @@ HnApplicationWindow {
                         Layout.fillHeight: true
                         Layout.minimumHeight: 0
                         clip: true
+                        activeFocusOnTab: true
+                        keyNavigationEnabled: false
+                        Keys.onPressed: event => {
+                            const intent = Object(placesNavigation.interpret(event.key, event.text, event.modifiers, false, true));
+                            if (intent.consumed) {
+                                if (intent.command === HnNavigation.ToggleHidden)
+                                    root.controller.hiddenVisible = !root.controller.hiddenVisible;
+                                else if (intent.command === HnNavigation.EditLocation)
+                                    root.editLocation();
+                                else if (intent.command >= HnNavigation.PanelLeft)
+                                    root.panelFocus(intent.command);
+                                else if (intent.command === HnNavigation.Open && currentItem)
+                                    root.controller.navigate(root.controller.places[places.currentIndex].path);
+                                else {
+                                    currentIndex = placesNavigation.target(currentIndex, intent, count, 1, height, HnMetrics.controlHeight(HnControlSize.Xs));
+                                    positionViewAtIndex(currentIndex, ListView.Contain);
+                                }
+                                event.accepted = true;
+                            } else if (event.modifiers === Qt.NoModifier && (event.key === Qt.Key_Return || event.key === Qt.Key_Enter || event.key === Qt.Key_Space) && currentItem) {
+                                root.controller.navigate(root.controller.places[places.currentIndex].path);
+                                event.accepted = true;
+                            }
+                        }
                         model: root.controller.places
                         Controls.ScrollBar.vertical: Controls.ScrollBar {}
                         delegate: HnListDelegate {
@@ -114,6 +156,7 @@ HnApplicationWindow {
                             focusPolicy: Qt.NoFocus
                             leadingContentAlignment: Qt.AlignVCenter
                             title: modelData.name
+                            keyboardCursor: ListView.isCurrentItem && places.activeFocus
                             currentItemSelects: false
                             highlighted: modelData.path === root.controller.location
                             leadingContent: Component {
@@ -160,7 +203,7 @@ HnApplicationWindow {
                             HnIconButton {
                                 objectName: "historyBack"
                                 sizeRole: HnControlSize.Compact
-                                focusPolicy: Qt.NoFocus
+                                focusPolicy: Qt.TabFocus
                                 icon.name: "go-previous"
                                 Accessible.name: qsTr("Back")
                                 enabled: root.controller.canGoBack && !root.controller.overwritePending
@@ -169,7 +212,7 @@ HnApplicationWindow {
                             HnIconButton {
                                 objectName: "historyForward"
                                 sizeRole: HnControlSize.Compact
-                                focusPolicy: Qt.NoFocus
+                                focusPolicy: Qt.TabFocus
                                 icon.name: "go-next"
                                 Accessible.name: qsTr("Forward")
                                 enabled: root.controller.canGoForward && !root.controller.overwritePending
@@ -178,7 +221,7 @@ HnApplicationWindow {
                             HnIconButton {
                                 objectName: "parentFolder"
                                 sizeRole: HnControlSize.Compact
-                                focusPolicy: Qt.NoFocus
+                                focusPolicy: Qt.TabFocus
                                 icon.name: "go-up"
                                 Accessible.name: qsTr("Up")
                                 onClicked: root.controller.parentFolder()
@@ -190,6 +233,7 @@ HnApplicationWindow {
                             implicitHeight: Math.max(breadcrumbs.implicitHeight, location.implicitHeight)
                             HnBreadcrumbBar {
                                 id: breadcrumbs
+                                vimNavigation: HnInputPreferences.vimNavigation
                                 anchors.fill: parent
                                 Layout.fillWidth: true
                                 visible: !root.editingLocation
@@ -266,6 +310,8 @@ HnApplicationWindow {
                                 Layout.minimumHeight: 0
                                 model: root.controller.entries
                                 currentIndex: root.controller.cursor
+                                activeFocusOnTab: true
+                                keyNavigationEnabled: false
                                 onCursorRequested: row => {
                                     root.controller.select(row);
                                     listing.forceActiveFocus();
@@ -289,7 +335,9 @@ HnApplicationWindow {
                                     filename: name
                                     sizeText: isDir ? "" : Number(size).toLocaleString(Qt.locale())
                                     modifiedText: modified.toLocaleString(Qt.locale(), Locale.ShortFormat)
-                                    highlighted: index === root.controller.cursor || root.controller.selectedIds.indexOf(nativeId) >= 0
+                                    currentItemSelects: false
+                                    keyboardCursor: index === root.controller.cursor && listing.activeFocus
+                                    highlighted: root.controller.selectedIds.indexOf(nativeId) >= 0
                                     selectionContent: Controls.CheckBox {
                                         objectName: "selection-" + entry.nativeId
                                         enabled: !entry.statFailed && entry.isDir === root.controller.directoryMode
@@ -320,15 +368,29 @@ HnApplicationWindow {
                                     onDoubleClicked: root.controller.activate(index)
                                 }
                                 Keys.onPressed: event => {
-                                    if (event.key === Qt.Key_J || event.key === Qt.Key_Down)
-                                        root.controller.move(1);
-                                    else if (event.key === Qt.Key_K || event.key === Qt.Key_Up)
-                                        root.controller.move(-1);
-                                    else if (event.key === Qt.Key_H || event.key === Qt.Key_Left)
-                                        root.controller.parentFolder();
-                                    else if (event.key === Qt.Key_L || event.key === Qt.Key_Right)
-                                        root.controller.activate(root.controller.cursor);
-                                    else if (event.key === Qt.Key_Space)
+                                    if (!navigation.active)
+                                        return;
+                                    // Keep the intention dynamic: Qt 6.12 AOT crashes on inferred QVariantMap property lookups.
+                                    const intent = Object(navigation.interpret(event.key, event.text, event.modifiers, false, true));
+                                    if (intent.consumed) {
+                                        if (intent.command === HnNavigation.Parent)
+                                            root.controller.parentFolder();
+                                        else if (intent.command === HnNavigation.Open)
+                                            root.controller.activate(root.controller.cursor);
+                                        else if (intent.command === HnNavigation.ToggleHidden)
+                                            root.controller.hiddenVisible = !root.controller.hiddenVisible;
+                                        else if (intent.command === HnNavigation.EditLocation)
+                                            root.editLocation();
+                                        else if (intent.command >= HnNavigation.PanelLeft)
+                                            root.panelFocus(intent.command);
+                                        else if (intent.command !== HnNavigation.Pending)
+                                            root.controller.select(listing.movementTarget(intent));
+                                        event.accepted = true;
+                                        return;
+                                    }
+                                    if (event.modifiers !== Qt.NoModifier)
+                                        return;
+                                    if (event.key === Qt.Key_Space)
                                         root.controller.toggle(root.controller.cursor);
                                     else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
                                         if (root.controller.cursorIsDirectory())
@@ -650,20 +712,20 @@ HnApplicationWindow {
         }
     }
     Shortcut {
-        sequence: "Ctrl+L"
-        enabled: !root.controller.overwritePending
+        sequences: HnInputPreferences.vimNavigation ? ["Alt+D"] : ["Ctrl+L", "Alt+D"]
+        enabled: !root.modalActive && (listing.activeFocus || places.activeFocus || breadcrumbs.activeFocus)
         onActivated: {
             root.editLocation();
         }
     }
     Shortcut {
         sequence: "Ctrl+H"
-        enabled: !root.controller.overwritePending
+        enabled: !HnInputPreferences.vimNavigation && !root.modalActive && (listing.activeFocus || places.activeFocus)
         onActivated: root.controller.hiddenVisible = !root.controller.hiddenVisible
     }
     Shortcut {
         sequence: "/"
-        enabled: listing.activeFocus
+        enabled: listing.activeFocus && !root.modalActive
         onActivated: query.forceActiveFocus()
     }
     Shortcut {
