@@ -264,7 +264,9 @@ void Controller::setFilename(const QString& value) {
 void Controller::reconcileCursor() {
   QVector<QByteArray> ids;
   ids.reserve(filter_.rowCount());
-  for (int row = 0; row < filter_.rowCount(); ++row) ids.append(rowPath(row));
+  for (int row = 0; row < filter_.rowCount(); ++row) {
+    ids.append(rowPath(row));
+  }
   cursor_.reconcile(std::move(ids));
   syncPreview();
   emit cursorChanged();

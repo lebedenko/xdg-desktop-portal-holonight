@@ -1332,10 +1332,11 @@ class PortalTests : public QObject {
     QTemporaryDir config;
     const auto previous = qgetenv("XDG_CONFIG_HOME");
     const auto restore = qScopeGuard([&] {
-      if (previous.isNull())
+      if (previous.isNull()) {
         qunsetenv("XDG_CONFIG_HOME");
-      else
+      } else {
         qputenv("XDG_CONFIG_HOME", previous);
+      }
     });
     qputenv("XDG_CONFIG_HOME", QFile::encodeName(config.path()));
     QDir().mkpath(config.filePath("holonight"));
@@ -1345,7 +1346,9 @@ class PortalTests : public QObject {
     preferences.close();
     QTemporaryDir temp;
     const auto folder = QFile::encodeName(temp.path());
-    for (const auto* name : {"a", "b", "c"}) writeFile(joinPath(folder, name));
+    for (const auto* name : {"a", "b", "c"}) {
+      writeFile(joinPath(folder, name));
+    }
     auto options = folderOptions(folder);
     options.multiple = true;
     Controller controller(options);
@@ -1353,8 +1356,11 @@ class PortalTests : public QObject {
     QVERIFY(presenter.show(&controller, options));
     QTRY_VERIFY(!controller.busy());
     QQuickWindow* window = nullptr;
-    for (auto* candidate : QGuiApplication::topLevelWindows())
-      if (candidate->isVisible()) window = qobject_cast<QQuickWindow*>(candidate);
+    for (auto* candidate : QGuiApplication::topLevelWindows()) {
+      if (candidate->isVisible()) {
+        window = qobject_cast<QQuickWindow*>(candidate);
+      }
+    }
     QVERIFY(window);
     auto* listing = window->findChild<QQuickItem*>("listing");
     QVERIFY(listing);
