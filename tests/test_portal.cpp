@@ -1340,9 +1340,9 @@ class PortalTests : public QObject {
     });
     qputenv("XDG_CONFIG_HOME", QFile::encodeName(config.path()));
     QDir().mkpath(config.filePath("holonight"));
-    QFile preferences(config.filePath("holonight/input.toml"));
+    QFile preferences(config.filePath("holonight/config.toml"));
     QVERIFY(preferences.open(QIODevice::WriteOnly));
-    preferences.write(vim ? "version = 1\nprofile = 'vim-navigation'\n" : "version = 1\nprofile = 'standard'\n");
+    preferences.write(vim ? "[input]\nnavigation = 'vim-navigation'\n" : "[input]\nnavigation = 'standard'\n");
     preferences.close();
     QTemporaryDir temp;
     const auto folder = QFile::encodeName(temp.path());
