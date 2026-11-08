@@ -24,6 +24,7 @@ class Request : public QDBusVirtualObject {
   Q_OBJECT
  public:
   Request(Backend* backend, QDBusMessage call, Options options);
+  Request(Backend* backend, QDBusMessage call, Options options, HolonightFileBrowser::ImageRuntimeOptions runtime);
   [[nodiscard]] QString introspect(const QString& path) const override;
   bool handleMessage(const QDBusMessage& message, const QDBusConnection& connection) override;
   Controller* controller() { return &controller_; }
@@ -41,6 +42,8 @@ class Backend : public QDBusVirtualObject {
   Q_OBJECT
  public:
   Backend(QDBusConnection connection, Presenter* presenter, QObject* parent = nullptr);
+  Backend(QDBusConnection connection, Presenter* presenter, HolonightFileBrowser::ImageRuntimeOptions runtime,
+          QObject* parent = nullptr);
   ~Backend() override;
   Backend(const Backend&) = delete;
   Backend& operator=(const Backend&) = delete;
@@ -59,6 +62,7 @@ class Backend : public QDBusVirtualObject {
   void connectionLost();
 
  private:
+  HolonightFileBrowser::ImageRuntimeOptions runtime_;
   QDBusConnection connection_;
   Presenter* presenter_;
   QHash<QString, Request*> requests_;

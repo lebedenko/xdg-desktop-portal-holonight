@@ -75,8 +75,10 @@ bool EntryFilter::filterAcceptsRow(int row, const QModelIndex& parent) const {
   });
 }
 Controller::Controller(Options options, QObject* parent)
+    : Controller(std::move(options), HolonightFileBrowser::defaultImageRuntimeOptions(), parent) {}
+Controller::Controller(Options options, HolonightFileBrowser::ImageRuntimeOptions runtime, QObject* parent)
     : QObject(parent),
-      preview_(new PreviewService),
+      preview_(new PreviewService(std::move(runtime))),
       options_(std::move(options)),
       reader_(new HolonightFileBrowser::DirectoryReader) {
   connect(preview_, &PreviewService::shutdownFinished, this, [this] { preview_retired_ = true; });

@@ -16,6 +16,7 @@
 #include <QRegularExpression>
 #include <QScopeGuard>
 #include <QScreen>
+#include <QSemaphore>
 #include <QSignalSpy>
 #include <QTemporaryDir>
 #include <QTest>
@@ -23,11 +24,23 @@
 
 #include <csignal>
 #include <fcntl.h>
+#include <memory>
 #include <sys/stat.h>
 #include <unistd.h>
 
+struct PreviewServiceTestAccess {
+  static void stage(PreviewService& service, ThumbnailService::StageCallback callback) {
+    service.thumbnail_stage_for_test_ = std::move(callback);
+  }
+  static void beforeFull(PreviewService& service, std::function<void()> callback) {
+    service.before_full_decode_for_test_ = std::move(callback);
+  }
+};
 using namespace Portal;
 namespace {
+QString acceptanceRuntime;
+QString acceptanceFixtures;
+QString acceptanceBus;
 Options folderOptions(const QByteArray& folder) {
   Options options;
   options.folder = folder;
@@ -926,6 +939,164 @@ class PortalTests : public QObject {
     QCOMPARE(reply.argumentAt<0>(), 2U);
     QCOMPARE(backend.activeRequests(), 0);
   }
+  void isolatedPreviewPresentation() {
+    if (acceptanceRuntime.isEmpty()) {
+      QSKIP("Explicit native acceptance is run separately with --image-runtime, --fixtures and --portal-bus");
+    }
+    QVERIFY2(QGuiApplication::platformName() == "offscreen", "Native interaction remains manual");
+    QVERIFY(QDir(acceptanceRuntime).exists());
+    QVERIFY(!acceptanceBus.isEmpty());
+    auto server = QDBusConnection::connectToBus(acceptanceBus, "preview-server");
+    auto client = QDBusConnection::connectToBus(acceptanceBus, "preview-client");
+    QVERIFY(server.isConnected() && client.isConnected());
+    struct RecordingPresenter : QmlPresenter {
+      Controller* current = nullptr;
+      std::shared_ptr<std::atomic_int> sources = std::make_shared<std::atomic_int>(0);
+      std::shared_ptr<std::atomic_int> caches = std::make_shared<std::atomic_int>(0);
+      bool show(Controller* controller, const Options& options) override {
+        current = controller;
+        PreviewServiceTestAccess::stage(*controller->preview(),
+                                        [source = sources, cache = caches](ThumbnailService::Stage stage) {
+                                          if (stage == ThumbnailService::Stage::OriginalDecode) {
+                                            ++*source;
+                                          } else if (stage == ThumbnailService::Stage::CacheDecode) {
+                                            ++*cache;
+                                          }
+                                        });
+        return QmlPresenter::show(controller, options);
+      }
+    } presenter;
+    Backend backend(server, &presenter, HolonightFileBrowser::ImageRuntimeOptions{acceptanceRuntime});
+    QVERIFY(backend.start());
+    for (int pass = 0; pass < 2; ++pass) {
+      const auto sourceBefore = presenter.sources->load();
+      const auto cacheBefore = presenter.caches->load();
+      const auto handle = "/test/preview" + QString::number(pass);
+      auto reply =
+          callChooser(client, "OpenFile", handle, {{"current_folder", QFile::encodeName(acceptanceFixtures) + '\0'}});
+      QTRY_VERIFY(backend.activeRequests() == 1 && presenter.current != nullptr);
+      auto* controller = presenter.current;
+      QTRY_VERIFY(!controller->busy());
+      QQuickWindow* window = nullptr;
+      for (auto* candidate : QGuiApplication::topLevelWindows()) {
+        if (candidate->isVisible()) {
+          window = qobject_cast<QQuickWindow*>(candidate);
+        }
+      }
+      QVERIFY(window);
+      window->resize(1100, 800);
+      auto* frame = window->findChild<QQuickItem*>("filePreviewFrame");
+      QVERIFY(frame);
+      const auto rendered = [&](const QColor& color) {
+        const auto image = window->grabWindow();
+        const auto point = frame->mapToScene({frame->width() / 2, frame->height() / 2}).toPoint();
+        return frame->isVisible() && image.rect().contains(point) && image.pixelColor(point) == color;
+      };
+      for (const auto& [name, color] : {
+               std::pair{"01-red.png", QColor(Qt::red)},
+               std::pair{"02-blue.png", QColor(Qt::blue)},
+               std::pair{"01-red.png", QColor(Qt::red)},
+               std::pair{"03-vector.svg", QColor(Qt::green)},
+           }) {
+        const auto cachedBefore = presenter.caches->load();
+        const auto row = findRow(*controller, name);
+        QVERIFY(row >= 0);
+        controller->select(row);
+        QTRY_VERIFY_WITH_TIMEOUT(!controller->preview()->busy(), 5000);
+        QVERIFY2(controller->preview()->hasImage(), qPrintable(controller->preview()->previewErrorMessage()));
+        QTRY_VERIFY(rendered(color));
+        if (QString::fromUtf8(name).endsWith(".png")) {
+          QCOMPARE(controller->preview()->sourcePixelSize(), QSize(160, 80));
+          QCOMPARE(controller->preview()->mimeType(), QString("image/png"));
+          QVERIFY(controller->preview()->exifMake().isEmpty());
+        }
+        if (pass == 1 && QString::fromUtf8(name) == "03-vector.svg") {
+          QVERIFY(presenter.caches->load() > cachedBefore);
+        }
+      }
+      if (pass == 0) {
+        QVERIFY(presenter.sources->load() > sourceBefore);
+      } else {
+        QCOMPARE(presenter.sources->load(), sourceBefore);
+        QVERIFY(presenter.caches->load() > cacheBefore);
+      }
+      const auto selected = controller->selectedIds();
+      const auto cursor = controller->cursor();
+      window->resize(800, 400);
+      auto* toggle = window->findChild<QQuickItem*>("previewToggle");
+      QVERIFY(toggle);
+      QTRY_VERIFY(toggle->isVisible());
+      QVERIFY(QMetaObject::invokeMethod(toggle, "clicked"));
+      QTRY_VERIFY(rendered(Qt::green));
+      QCOMPARE(controller->selectedIds(), selected);
+      QCOMPARE(controller->cursor(), cursor);
+      auto closing = closeRequest(client, handle);
+      QTRY_VERIFY(closing.isFinished() && reply.isFinished());
+      QTRY_COMPARE(backend.activeRequests(), 0);
+      QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
+      presenter.current = nullptr;
+    }
+    backend.shutdown();
+  }
+
+  void isolatedPreviewErrors() {
+    if (acceptanceRuntime.isEmpty()) {
+      QSKIP("Explicit native acceptance is run separately");
+    }
+    QVERIFY(QGuiApplication::platformName() == "offscreen");
+    QTemporaryDir directory;
+    QVERIFY(QFile::copy(QDir(acceptanceFixtures).filePath("01-red.png"), directory.filePath("error.png")));
+    for (bool timeout : {false, true}) {
+      QmlPresenter presenter;
+      Controller controller(
+          folderOptions(QFile::encodeName(directory.path())),
+          HolonightFileBrowser::ImageRuntimeOptions{timeout ? acceptanceRuntime : "/missing/runtime"});
+      auto resume = std::make_shared<QSemaphore>();
+      auto reached = std::make_shared<QSemaphore>();
+      const auto release = qScopeGuard([&] { resume->release(); });
+      if (timeout) {
+        PreviewServiceTestAccess::beforeFull(*controller.preview(), [resume, reached] {
+          reached->release();
+          resume->tryAcquire(1, 8000);
+        });
+      }
+      QVERIFY(presenter.show(&controller, folderOptions(QFile::encodeName(directory.path()))));
+      QTRY_VERIFY(!controller.busy());
+      if (timeout) {
+        QTRY_VERIFY(reached->available() > 0);
+      }
+      QTRY_COMPARE_WITH_TIMEOUT(controller.preview()->previewErrorKind(),
+                                timeout ? PreviewService::PreviewErrorKind::DecodeTimeout
+                                        : PreviewService::PreviewErrorKind::RuntimeUnavailable,
+                                5000);
+      QVERIFY(!controller.preview()->hasImage());
+      QQuickWindow* window = nullptr;
+      for (auto* candidate : QGuiApplication::topLevelWindows()) {
+        if (candidate->isVisible()) {
+          window = qobject_cast<QQuickWindow*>(candidate);
+        }
+      }
+      QVERIFY(window);
+      window->resize(1100, 800);
+      auto* caption = window->findChild<QQuickItem*>("filePreviewFailureCaption");
+      QVERIFY(caption);
+      QTRY_VERIFY(caption->isVisible());
+      window->resize(800, 400);
+      auto* toggle = window->findChild<QQuickItem*>("previewToggle");
+      QVERIFY(toggle);
+      QTRY_VERIFY(toggle->isVisible());
+      QVERIFY(QMetaObject::invokeMethod(toggle, "clicked"));
+      QTRY_VERIFY(caption->isVisible());
+      QSignalSpy retired(controller.preview(), &PreviewService::shutdownFinished);
+      controller.stop();
+      resume->release();
+      QTRY_VERIFY(!retired.isEmpty());
+      presenter.close(&controller);
+      QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
+      QVERIFY(!controller.preview()->hasImage());
+    }
+  }
+
   void previewFollowsCursorAndCancellation() {
     QTemporaryDir dir;
     QImage image(16, 8, QImage::Format_RGB32);
@@ -1478,6 +1649,21 @@ int main(int argc, char** argv) {
   QGuiApplication app(argc, argv);
   QQuickStyle::setStyle("Holonight");
   PortalTests tests;
-  return QTest::qExec(&tests, argc, argv);
+  auto arguments = QGuiApplication::arguments();
+  for (const auto& [option, destination] : {
+           std::pair{"--image-runtime", &acceptanceRuntime},
+           std::pair{"--fixtures", &acceptanceFixtures},
+           std::pair{"--portal-bus", &acceptanceBus},
+       }) {
+    const auto index = arguments.indexOf(option);
+    if (index >= 0) {
+      if (index + 1 >= arguments.size()) {
+        return 1;
+      }
+      *destination = arguments.takeAt(index + 1);
+      arguments.removeAt(index);
+    }
+  }
+  return QTest::qExec(&tests, arguments);
 }
 #include "test_portal.moc"

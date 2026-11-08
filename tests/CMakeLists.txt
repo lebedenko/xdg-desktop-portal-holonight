@@ -25,7 +25,7 @@ foreach(target portal-tests portal-native-probe)
   target_compile_options(${target} PRIVATE -Wall -Wextra -Wpedantic)
 endforeach()
 file(GENERATE OUTPUT ${PROJECT_BINARY_DIR}/native-check.sh CONTENT
-  "#!/usr/bin/env bash\nset -euo pipefail\nexport QML_IMPORT_PATH='${runtime_qml}'\nexec '${DBUS_RUN_SESSION}' --config-file='${CMAKE_CURRENT_SOURCE_DIR}/dbus-session.conf' -- '$<TARGET_FILE:portal-native-probe>' \"\$@\"\n")
+  "#!/usr/bin/env bash\nset -euo pipefail\nexport QML_IMPORT_PATH='${runtime_qml}'\nexec '${Python3_EXECUTABLE}' '${PROJECT_SOURCE_DIR}/scripts/private-bus.py' --config '${CMAKE_CURRENT_SOURCE_DIR}/dbus-session.conf' -- '$<TARGET_FILE:portal-native-probe>' \"$@\"\n")
 
 qt_add_executable(portal-settings-tests test_settings.cpp)
 set_target_properties(portal-settings-tests PROPERTIES QT_QML_MODULE_NO_IMPORT_SCAN TRUE)

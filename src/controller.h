@@ -70,6 +70,7 @@ class Controller : public QObject {
   Q_PROPERTY(QVariantList choices READ choices NOTIFY choicesChanged)
  public:
   explicit Controller(Options options, QObject* parent = nullptr);
+  Controller(Options options, HolonightFileBrowser::ImageRuntimeOptions runtime, QObject* parent = nullptr);
   ~Controller() override;
   Controller(const Controller&) = delete;
   Controller& operator=(const Controller&) = delete;

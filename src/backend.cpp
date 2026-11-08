@@ -5,10 +5,13 @@
 
 namespace Portal {
 Request::Request(Backend* backend, QDBusMessage call, Options options)
+    : Request(backend, std::move(call), std::move(options), HolonightFileBrowser::defaultImageRuntimeOptions()) {}
+Request::Request(Backend* backend, QDBusMessage call, Options options,
+                 HolonightFileBrowser::ImageRuntimeOptions runtime)
     : QDBusVirtualObject(backend),
       backend_(backend),
       call_(std::move(call)),
-      controller_(std::move(options)),
+      controller_(std::move(options), std::move(runtime)),
       owner_(call_.service(), backend->connection(), QDBusServiceWatcher::WatchForUnregistration) {
   connect(&controller_, &Controller::completed, this, &Request::complete);
   connect(&owner_, &QDBusServiceWatcher::serviceUnregistered, this, [this] { complete(1, {}); });
@@ -42,7 +45,11 @@ void Request::complete(uint response, const QVariantMap& results) {
   backend_->retire(this, response, results);
 }
 Backend::Backend(QDBusConnection connection, Presenter* presenter, QObject* parent)
+    : Backend(std::move(connection), presenter, HolonightFileBrowser::defaultImageRuntimeOptions(), parent) {}
+Backend::Backend(QDBusConnection connection, Presenter* presenter, HolonightFileBrowser::ImageRuntimeOptions runtime,
+                 QObject* parent)
     : QDBusVirtualObject(parent),
+      runtime_(std::move(runtime)),
       connection_(std::move(connection)),
       presenter_(presenter),
       settings_(appearance_.appearance()) {
@@ -148,7 +155,7 @@ bool Backend::handleMessage(const QDBusMessage& message, const QDBusConnection& 
   }
   const auto options = decodeOptions(operation, args[3].toString(), args[2].toString(), decode<QVariantMap>(args[4]));
   message.setDelayedReply(true);
-  auto* request = new Request(this, message, options);
+  auto* request = new Request(this, message, options, runtime_);
   if (!connection_.registerVirtualObject(handle, request)) {
     connection.send(message.createReply({QVariant::fromValue(2U), QVariantMap{}}));
     request->deleteLater();

@@ -23,7 +23,9 @@
 
 // A manual native host. It never moves the pointer, activates a window or synthesizes input.
 struct Probe {
-  Probe() = default;
+  Probe(HolonightFileBrowser::ImageRuntimeOptions runtime, const QString& address)
+      : broker(QDBusConnection::connectToBus(address, "native-broker")),
+        backend(QDBusConnection::connectToBus(address, "native-backend"), &presenter, std::move(runtime)) {}
   Probe(const Probe&) = delete;
   Probe& operator=(const Probe&) = delete;
   Probe(Probe&&) = delete;
@@ -31,8 +33,8 @@ struct Probe {
   QQmlEngine engine;
   QQuickWindow parent;
   Portal::QmlPresenter presenter;
-  QDBusConnection broker = QDBusConnection::connectToBus(QDBusConnection::SessionBus, "native-broker");
-  Portal::Backend backend{QDBusConnection::sessionBus(), &presenter};
+  QDBusConnection broker;
+  Portal::Backend backend;
   DemoController demo{broker};
   wl_display* display = nullptr;
   wl_event_queue* queue = nullptr;
@@ -43,6 +45,7 @@ struct Probe {
   wl_callback* registry_sync = nullptr;
   QTimer dispatch;
   QString mode;
+  QString folder = QDir::homePath();
   bool modal = true;
   bool started = false;
   ~Probe() {
@@ -86,7 +89,7 @@ struct Probe {
     } else if (mode == "many") {
       method = "SaveFiles";
     }
-    QVariantMap options{{"current_folder", QFile::encodeName(QDir::homePath()) + '\0'},
+    QVariantMap options{{"current_folder", QFile::encodeName(folder) + '\0'},
                         {"modal", modal},
                         {"multiple", mode == "multi"},
                         {"directory", mode == "directory"},
@@ -223,8 +226,30 @@ struct Probe {
 int main(int argc, char** argv) {
   QGuiApplication app(argc, argv);
   QQuickStyle::setStyle("Holonight");
-  Probe probe;
-  probe.mode = QGuiApplication::arguments().value(1, "open");
+  auto arguments = QGuiApplication::arguments();
+  const auto takeOption = [&](const QString& option) {
+    const auto index = arguments.indexOf(option);
+    if (index < 0 || index + 1 >= arguments.size()) {
+      return QString{};
+    }
+    const auto value = arguments.takeAt(index + 1);
+    arguments.removeAt(index);
+    return value;
+  };
+  const auto address = takeOption("--portal-bus");
+  const auto runtime = takeOption("--image-runtime");
+  const auto folder = takeOption("--folder");
+  if (address.isEmpty()) {
+    qCritical("An explicit private --portal-bus is required; use native-check.sh");
+    return 1;
+  }
+  Probe probe(runtime.isEmpty() ? HolonightFileBrowser::defaultImageRuntimeOptions()
+                                : HolonightFileBrowser::ImageRuntimeOptions{runtime},
+              address);
+  probe.mode = arguments.value(1, "open");
+  if (!folder.isEmpty()) {
+    probe.folder = folder;
+  }
   probe.modal = !QGuiApplication::arguments().contains("--nonmodal");
   if (!probe.start()) {
     return 1;
