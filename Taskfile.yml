@@ -66,3 +66,9 @@ tasks:
     desc: qmltypes-check
     cmds:
     - python3 scripts/quality.py qmltypes --build build/{{.PRESET}} --module HolonightPortal --module HolonightPortal.Private
+  test:isolated:
+    desc: Required host runtime selection (explicit RUNTIME and FIXTURES)
+    requires:
+      vars: [RUNTIME, FIXTURES]
+    cmds:
+    - python3 scripts/test-lane.py --framework qt --inventory tests/lanes.json --lane host --runtime '{{.RUNTIME}}' -- python3 scripts/private-bus.py --config tests/dbus-session.conf -- build/{{.PRESET}}/tests/portal-tests --fixtures '{{.FIXTURES}}'

@@ -1,3 +1,4 @@
+find_package(Python3 REQUIRED COMPONENTS Interpreter)
 find_package(Qt6 6.11 REQUIRED COMPONENTS Test)
 find_program(DBUS_RUN_SESSION dbus-run-session REQUIRED)
 qt_add_executable(portal-tests test_portal.cpp)
@@ -5,7 +6,7 @@ set_target_properties(portal-tests PROPERTIES QT_QML_MODULE_NO_IMPORT_SCAN TRUE)
 target_link_libraries(portal-tests PRIVATE portal-presentation Qt6::Test Qt6::QuickControls2)
 qt_add_resources(portal-tests chooser PREFIX /qt/qml/HolonightPortal BASE ${PROJECT_SOURCE_DIR}/qml
   FILES ${PROJECT_SOURCE_DIR}/qml/Chooser.qml)
-add_test(NAME portal-tests COMMAND ${DBUS_RUN_SESSION} --config-file=${CMAKE_CURRENT_SOURCE_DIR}/dbus-session.conf
+add_test(NAME portal-tests COMMAND ${Python3_EXECUTABLE} "${PROJECT_SOURCE_DIR}/scripts/test-lane.py" --framework qt --inventory "${CMAKE_CURRENT_SOURCE_DIR}/lanes.json" --lane portable -- ${DBUS_RUN_SESSION} --config-file=${CMAKE_CURRENT_SOURCE_DIR}/dbus-session.conf
   -- $<TARGET_FILE:portal-tests>)
 string(REPLACE ";" ":" runtime_qml "${QML_IMPORT_PATH}")
 set_tests_properties(portal-tests PROPERTIES TIMEOUT 60 ENVIRONMENT
@@ -48,3 +49,6 @@ add_custom_target(portal-demo-qmllint
   COMMAND Qt6::qmllint ${PROJECT_SOURCE_DIR}/qml/Demo.qml
   VERBATIM)
 add_dependencies(all_qmllint portal-demo-qmllint)
+
+add_test(NAME consumer-test-lane COMMAND ${Python3_EXECUTABLE}
+  "${PROJECT_SOURCE_DIR}/scripts/check-test-lane.py")

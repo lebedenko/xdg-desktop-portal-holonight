@@ -134,3 +134,26 @@ For manual migration from the unreleased `input.toml` contract, copy its `profil
 value into `[input].navigation` in `config.toml`. The old `version` and `profile`
 keys are no longer read. Old files are never deleted automatically. There are no
 application-specific navigation overrides.
+
+### Isolated image acceptance
+
+Ordinary CTest and container `task check` run the portable inventory in
+`tests/lanes.json`. Enumeration rejects unassigned, overlapping or stale entries.
+Container success does not establish isolated preview acceptance.
+
+With a host-native build against `$PREFIX`, run the required host selection:
+
+```sh
+QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software \
+  QML_IMPORT_PATH="$PREFIX/lib/qt6/qml" \
+  task test:isolated RUNTIME="$PREFIX/libexec/holonight-images/runtime" \
+  FIXTURES="$FIXTURES"
+```
+
+`FIXTURES` contains the umbrella gate's `01-red.png`, `02-blue.png` and
+`03-vector.svg` fixtures. The selection covers rendered pixels, unavailable
+runtime, timeout, cursor/selection cancellation and request retirement. It uses
+the private non-activating portal bus without replacing Images' real session bus.
+Missing runtime inputs, skipped host tests and incomplete results fail.
+Before publication run the umbrella `scripts/check-isolated-previews.py` gate
+against a disposable host-native installed prefix; see the umbrella isolation note.

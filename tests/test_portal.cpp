@@ -941,7 +941,7 @@ class PortalTests : public QObject {
   }
   void isolatedPreviewPresentation() {
     if (acceptanceRuntime.isEmpty()) {
-      QSKIP("Explicit native acceptance is run separately with --image-runtime, --fixtures and --portal-bus");
+      QFAIL("Explicit --image-runtime, --fixtures and --portal-bus required");
     }
     QVERIFY2(QGuiApplication::platformName() == "offscreen", "Native interaction remains manual");
     QVERIFY(QDir(acceptanceRuntime).exists());
@@ -1041,7 +1041,7 @@ class PortalTests : public QObject {
 
   void isolatedPreviewErrors() {
     if (acceptanceRuntime.isEmpty()) {
-      QSKIP("Explicit native acceptance is run separately");
+      QFAIL("Explicit --image-runtime required");
     }
     QVERIFY(QGuiApplication::platformName() == "offscreen");
     QTemporaryDir directory;
@@ -1098,6 +1098,7 @@ class PortalTests : public QObject {
   }
 
   void previewFollowsCursorAndCancellation() {
+    QVERIFY2(!acceptanceRuntime.isEmpty(), "Explicit --image-runtime required");
     QTemporaryDir dir;
     QImage image(16, 8, QImage::Format_RGB32);
     image.fill(Qt::red);
@@ -1105,7 +1106,7 @@ class PortalTests : public QObject {
     writeFile(QFile::encodeName(dir.filePath("b.txt")));
     auto options = folderOptions(QFile::encodeName(dir.path()));
     options.multiple = true;
-    Controller controller(options);
+    Controller controller(options, HolonightFileBrowser::ImageRuntimeOptions{acceptanceRuntime});
     QTRY_VERIFY(!controller.busy());
     const auto imageRow = findRow(controller, "a.png");
     const auto textRow = findRow(controller, "b.txt");
@@ -1125,6 +1126,7 @@ class PortalTests : public QObject {
   }
 
   void previewRetiresAfterRequestDestruction() {
+    QVERIFY2(!acceptanceRuntime.isEmpty(), "Explicit --image-runtime required");
     QTemporaryDir dir;
     QVERIFY(QDir(dir.path()).mkdir("initial"));
     QImage image(32, 16, QImage::Format_RGB32);
@@ -1132,7 +1134,8 @@ class PortalTests : public QObject {
     QVERIFY(image.save(dir.filePath("pending.png")));
     QPointer<PreviewService> service;
     {
-      Controller controller(folderOptions(QFile::encodeName(dir.path())));
+      Controller controller(folderOptions(QFile::encodeName(dir.path())),
+                            HolonightFileBrowser::ImageRuntimeOptions{acceptanceRuntime});
       service = controller.preview();
       QTRY_VERIFY(!controller.busy());
       controller.setCursor(findRow(controller, "pending.png"));
