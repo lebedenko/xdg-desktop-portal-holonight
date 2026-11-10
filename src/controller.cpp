@@ -130,6 +130,16 @@ Controller::Controller(Options options, HolonightFileBrowser::ImageRuntimeOption
       choice.selected = choice.values.front().id;
     }
   }
+  connect(&selection_, &HolonightFileBrowser::SelectionSession::changed, this, [this] {
+    invalidateValidation();
+    emit selectionChanged();
+    emit changed();
+  });
+  connect(reader_, &HolonightFileBrowser::DirectoryReader::changed, this, &Controller::syncSelection);
+  connect(&filter_, &QAbstractItemModel::modelReset, this, &Controller::syncSelection);
+  connect(&filter_, &QAbstractItemModel::rowsInserted, this, &Controller::syncSelection);
+  connect(&filter_, &QAbstractItemModel::rowsRemoved, this, &Controller::syncSelection);
+  connect(&filter_, &QAbstractItemModel::layoutChanged, this, &Controller::syncSelection);
   initializeLocation();
 }
 // Qt parents own watchers, including when the controller is cancelled before completion.
@@ -216,7 +226,7 @@ void Controller::invalidateValidation() {
 }
 QStringList Controller::selectedIds() const {
   QStringList ids;
-  for (const auto& item : selection_.selected) {
+  for (const auto& item : selection_.selected()) {
     ids.append(QString::fromLatin1(item.toHex()));
   }
   return ids;
@@ -270,11 +280,13 @@ void Controller::reconcileCursor() {
     ids.append(rowPath(row));
   }
   cursor_.reconcile(std::move(ids));
+  selection_.restoreCursor(rowPath(cursor()));
   syncPreview();
   emit cursorChanged();
 }
 void Controller::setCursor(int value) {
   cursor_.setIndex(value);
+  selection_.restoreCursor(rowPath(cursor()));
   syncPreview();
   emit cursorChanged();
 }
@@ -323,7 +335,7 @@ void Controller::navigateTo(const QByteArray& path, bool recordHistory) {
   folder_ = path;
   breadcrumbs_.setPath(folder_);
   ++navigation_generation_;
-  selection_.selected.clear();
+  selection_.clear();
   cursor_.clear();
   query_.clear();
   ++search_generation_;
@@ -373,20 +385,82 @@ bool Controller::selectable(int row) const {
   return index.isValid() && !index.data(DirectoryRoles::StatFailedRole).toBool() &&
          (options_.directory == index.data(DirectoryRoles::IsDirRole).toBool());
 }
+void Controller::syncSelection() {
+  QList<QByteArray> visible;
+  QList<QByteArray> ineligible;
+  for (int row = 0; row < filter_.rowCount(); ++row) {
+    visible.append(rowPath(row));
+    if (!selectable(row)) {
+      ineligible.append(rowPath(row));
+    }
+  }
+  selection_.setVisibleEntries(visible, ineligible);
+  QList<QByteArray> available;
+  for (int row = 0; row < reader_->rowCount(); ++row) {
+    available.append(reader_->index(row, 0).data(DirectoryRoles::NativePathRole).toByteArray());
+  }
+  selection_.reconcile(available, !reader_->scanning() && reader_->directoryError().isEmpty() && !navigating_);
+}
 void Controller::select(int row) {
   if (row < 0 || row >= filter_.rowCount()) {
     return;
   }
   setCursor(row);
   if (!multiple() && !save()) {
-    invalidateValidation();
-    selection_.selected.clear();
+    selection_.clear();
     if (selectable(row)) {
-      selection_.single(rowPath(row));
+      selection_.pointer(row);
     }
-    emit selectionChanged();
-    emit changed();
+  } else {
+    selection_.move(row);
   }
+}
+void Controller::pointerSelect(int row, int modifiers) {
+  if (row < 0 || row >= filter_.rowCount()) {
+    return;
+  }
+  setCursor(row);
+  if (!selectable(row)) {
+    if ((modifiers & (Qt::ControlModifier | Qt::ShiftModifier)) == 0) {
+      selection_.clear();
+    }
+    return;
+  }
+  selection_.pointer(row, multiple() && ((modifiers & Qt::ControlModifier) != 0),
+                     multiple() && ((modifiers & Qt::ShiftModifier) != 0));
+}
+bool Controller::selectionKey(int key, int modifiers, bool repeat) {
+  if (key == Qt::Key_Escape &&
+      (selection_.selectedCount() > 0 || selection_.mode() != HolonightFileBrowser::SelectionSession::Mode::Normal)) {
+    selection_.clear();
+    return true;
+  }
+  if (!multiple()) {
+    return false;
+  }
+  if (key == Qt::Key_V && modifiers == Qt::ControlModifier) {
+    selection_.beginMark(cursor());
+    return true;
+  }
+  if (modifiers != Qt::NoModifier) {
+    return false;
+  }
+  if (key == Qt::Key_V) {
+    selection_.beginRange(cursor());
+    return true;
+  }
+  if (key == Qt::Key_O && selection_.mode() == HolonightFileBrowser::SelectionSession::Mode::Visual) {
+    selection_.swapEnds();
+    setCursor(selection_.cursorRow());
+    return true;
+  }
+  if (key == Qt::Key_Space && selection_.mode() == HolonightFileBrowser::SelectionSession::Mode::Mark) {
+    if (!repeat) {
+      selection_.toggle(cursor());
+    }
+    return true;
+  }
+  return false;
 }
 void Controller::activate(int row) {
   if (row < 0 || row >= filter_.rowCount()) {
@@ -410,11 +484,13 @@ void Controller::toggle(int row) {
     return;
   }
   invalidateValidation();
-  const auto path = rowPath(row);
-  if (!multiple() && !selection_.selected.contains(path)) {
-    selection_.selected.clear();
+  if (multiple()) {
+    selection_.toggle(row);
+  } else if (selection_.isRowSelected(row)) {
+    selection_.clear();
+  } else {
+    selection_.pointer(row);
   }
-  selection_.toggle(path);
   emit selectionChanged();
   emit changed();
 }
@@ -466,7 +542,7 @@ void Controller::refreshSearch() {
   }));
 }
 void Controller::accept() {
-  if (!busy() && options_.operation == Operation::Open && !options_.directory && selection_.selected.isEmpty() &&
+  if (!busy() && options_.operation == Operation::Open && !options_.directory && selection_.selected().isEmpty() &&
       cursorIsDirectory()) {
     activate(cursor());
     return;
@@ -486,9 +562,9 @@ void Controller::startValidation(bool overwriteConfirmed) {
     }
     paths.append(joinPath(folder_, filename_));
   } else if (options_.operation == Operation::SaveMany) {
-    paths.append(selection_.selected.isEmpty() ? folder_ : selection_.selected.front());
-  } else if (!selection_.selected.isEmpty()) {
-    paths = selection_.selected;
+    paths.append(selection_.selected().isEmpty() ? folder_ : selection_.selected().front());
+  } else if (!selection_.selected().isEmpty()) {
+    paths = selection_.selected();
   } else if (options_.directory) {
     paths.append(folder_);
   } else if (!multiple() && selectable(cursor())) {

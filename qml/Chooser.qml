@@ -289,17 +289,27 @@ HnApplicationWindow {
                         spacing: 0
                         ColumnLayout {
                             Layout.fillWidth: true
+                            Layout.minimumWidth: 0
+                            Layout.preferredWidth: 0
                             Layout.fillHeight: true
                             Layout.minimumHeight: 0
                             Layout.margins: 12
                             spacing: 0
+                            HnLabel {
+                                id: gutterMetric
+                                visible: false
+                                role: HnTypographyRole.Code
+                                rawText: "9".repeat(Math.max(3, String(listing.count).length))
+                            }
                             DetailedColumnLayout {
                                 id: detailColumns
                                 availableWidth: listing.width
-                                selectionWidth: root.controller.multiple ? 36 : 0
+                                gutterWidth: gutterMetric.implicitWidth + 16
                             }
                             DetailedListHeader {
                                 Layout.fillWidth: true
+                                Layout.minimumWidth: 0
+                                Layout.preferredWidth: 0
                                 columns: detailColumns
                             }
                             DirectoryListing {
@@ -330,44 +340,41 @@ HnApplicationWindow {
                                     required property real size
                                     required property var modified
                                     width: listing.width
+                                    focusPolicy: Qt.NoFocus
+                                    rowIndex: index
+                                    cursorIndex: root.controller.cursor
                                     columns: detailColumns
                                     title: name
                                     filename: name
-                                    sizeText: isDir ? "" : Number(size).toLocaleString(Qt.locale())
+                                    sizeText: isDir ? "" : HnFormat.formatSize(size)
                                     modifiedText: modified.toLocaleString(Qt.locale(), Locale.ShortFormat)
                                     currentItemSelects: false
                                     keyboardCursor: index === root.controller.cursor && listing.activeFocus
                                     highlighted: root.controller.selectedIds.indexOf(nativeId) >= 0
-                                    selectionContent: Controls.CheckBox {
-                                        objectName: "selection-" + entry.nativeId
-                                        enabled: !entry.statFailed && entry.isDir === root.controller.directoryMode
-                                        checked: root.controller.selectedIds.indexOf(entry.nativeId) >= 0
-                                        Accessible.name: qsTr("Select %1").arg(entry.name)
-                                        onClicked: {
-                                            root.controller.toggle(entry.index);
-                                            listing.forceActiveFocus();
-                                        }
+                                    fileIconName: iconName
+                                    isDirectory: isDir
+                                    TapHandler {
+                                        id: selectionTap
+                                        property int pressModifiers: Qt.NoModifier
+                                        onPressedChanged: if (pressed)
+                                            pressModifiers = point.modifiers
+                                        acceptedButtons: Qt.LeftButton
                                     }
-                                    filenameContent: RowLayout {
-                                        HnIcon {
-                                            size: HnMetrics.controlHeight(HnControlSize.Compact)
-                                            source: entry.iconName ? "image://icon/" + entry.iconName : ""
-                                            rendering: HnIcon.Original
-                                        }
-                                        HnLabel {
-                                            rawText: entry.name
-                                            elide: Text.ElideRight
-                                            Layout.fillWidth: true
-                                        }
-                                    }
-                                    Keys.onSpacePressed: root.controller.toggle(index)
                                     onClicked: {
-                                        root.controller.select(index);
+                                        root.controller.pointerSelect(index, selectionTap.pressModifiers);
                                         listing.forceActiveFocus();
                                     }
                                     onDoubleClicked: root.controller.activate(index)
                                 }
+                                Keys.priority: Keys.BeforeItem
+                                Keys.onShortcutOverride: event => {
+                                    event.accepted = event.key === Qt.Key_Escape && (root.controller.selection.selectedCount > 0 || root.controller.selection.mode !== SelectionSession.Normal);
+                                }
                                 Keys.onPressed: event => {
+                                    if (navigation.active && root.controller.selectionKey(event.key, event.modifiers, event.isAutoRepeat)) {
+                                        event.accepted = true;
+                                        return;
+                                    }
                                     if (!navigation.active)
                                         return;
                                     // Keep the intention dynamic: Qt 6.12 AOT crashes on inferred QVariantMap property lookups.
@@ -391,7 +398,7 @@ HnApplicationWindow {
                                     if (event.modifiers !== Qt.NoModifier)
                                         return;
                                     if (event.key === Qt.Key_Space)
-                                        root.controller.toggle(root.controller.cursor);
+                                        return;
                                     else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
                                         if (root.controller.cursorIsDirectory())
                                             root.controller.activate(root.controller.cursor);
@@ -496,12 +503,19 @@ HnApplicationWindow {
                         text: qsTr("Additional options")
                         onClicked: optionsPopup.open()
                     }
-                    HnLabel {
+                    RowLayout {
                         Layout.row: root.wide ? 0 : 1
                         Layout.column: root.wide ? 2 : 0
-                        role: HnTypographyRole.Caption
-                        visible: root.controller.multiple
-                        rawText: qsTr("%n selected", "", root.controller.selectedIds.length)
+                        HnModeBadge {
+                            objectName: "modeBadge"
+                            label: root.controller.selection.mode === SelectionSession.Visual ? "VISUAL" : root.controller.selection.mode === SelectionSession.Mark ? "V-MARK" : "NORMAL"
+                            fill: root.controller.selection.mode === SelectionSession.Normal ? HoloniightPalette.accentBlue : HoloniightPalette.accentViolet
+                        }
+                        HnLabel {
+                            role: HnTypographyRole.Caption
+                            visible: root.controller.multiple
+                            rawText: qsTr("%n selected", "", root.controller.selectedIds.length) + (root.controller.selection.hiddenSelectedCount > 0 ? qsTr(" (%1 hidden)").arg(root.controller.selection.hiddenSelectedCount) : "")
+                        }
                     }
                     Controls.BusyIndicator {
                         Layout.row: root.wide ? 0 : 1
@@ -602,48 +616,6 @@ HnApplicationWindow {
         anchors.margins: 12
         visible: root.wide || previewDrawer.visible
         service: root.controller.preview
-        metadataRows: service.hasEntry ? [
-            {
-                label: qsTr("Name"),
-                value: service.name
-            },
-            {
-                label: qsTr("Size"),
-                value: Number(service.size).toLocaleString(Qt.locale())
-            },
-            {
-                label: qsTr("Modified"),
-                value: service.modified.toLocaleString(Qt.locale(), Locale.ShortFormat)
-            },
-            {
-                label: qsTr("Type"),
-                value: service.mimeTypeDescription
-            },
-            {
-                label: qsTr("Permissions"),
-                value: service.permissions
-            },
-            {
-                label: qsTr("Dimensions"),
-                value: service.sourcePixelSize.width > 0 ? "%1 × %2".arg(service.sourcePixelSize.width).arg(service.sourcePixelSize.height) : ""
-            },
-            {
-                label: qsTr("Camera"),
-                value: [service.exifMake, service.exifModel].filter(part => part.length > 0).join(" ")
-            },
-            {
-                label: qsTr("Lens"),
-                value: service.exifLensModel
-            },
-            {
-                label: qsTr("Exposure"),
-                value: service.exifExposureTime
-            },
-            {
-                label: qsTr("ISO"),
-                value: service.exifIso
-            }
-        ].filter(row => String(row.value).length > 0) : []
     }
 
     Controls.Popup {

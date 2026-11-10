@@ -420,6 +420,47 @@ class PortalTests : public QObject {
     QCOMPARE(done.front()[1].toMap().value("uris").toStringList(),
              QStringList{localUri(joinPath(folder, "file2.txt"))});
   }
+  void pointerAndKeyboardSelectionShareMarksAndReconcileRemoval() {
+    QTemporaryDir temp;
+    const auto folder = QFile::encodeName(temp.path());
+    for (const auto& name : {"a", "b", "c", "d"}) {
+      writeFile(joinPath(folder, name));
+    }
+    auto options = folderOptions(folder);
+    options.multiple = true;
+    Controller controller(options);
+    QTRY_VERIFY(!controller.busy());
+    controller.pointerSelect(findRow(controller, "a"));
+    controller.pointerSelect(findRow(controller, "c"), Qt::ControlModifier);
+    QCOMPARE(controller.selectedIds().size(), 2);
+    QCOMPARE(controller.selection()->mode(), HolonightFileBrowser::SelectionSession::Mode::Mark);
+    controller.pointerSelect(findRow(controller, "d"), Qt::ShiftModifier);
+    QCOMPARE(controller.selectedIds().size(), 2);
+    controller.selectionKey(Qt::Key_V, Qt::ControlModifier, false);
+    controller.select(findRow(controller, "a"));
+    QCOMPARE(controller.selectedIds().size(), 2);
+    controller.selectionKey(Qt::Key_Space, Qt::NoModifier, true);
+    QCOMPARE(controller.selectedIds().size(), 2);
+    controller.selectionKey(Qt::Key_Space, Qt::NoModifier, false);
+    QCOMPARE(controller.selectedIds().size(), 3);
+    controller.search("a");
+    QTRY_COMPARE(controller.entries()->rowCount(), 1);
+    QCOMPARE(controller.selection()->hiddenSelectedCount(), 2);
+    QVERIFY(QFile::remove(temp.filePath("c")));
+    auto* filtered = qobject_cast<QAbstractProxyModel*>(controller.entries());
+    QVERIFY(filtered);
+    auto* sorted = qobject_cast<QAbstractProxyModel*>(filtered->sourceModel());
+    QVERIFY(sorted);
+    auto* reader = qobject_cast<HolonightFileBrowser::DirectoryReader*>(sorted->sourceModel());
+    QVERIFY(reader);
+    reader->refresh();
+    QTRY_VERIFY(!reader->scanning());
+    QCOMPARE(controller.selectedIds().size(), 2);
+    QCOMPARE(controller.selection()->hiddenSelectedCount(), 1);
+    QVERIFY(controller.selectionKey(Qt::Key_Escape, Qt::NoModifier, false));
+    QVERIFY(controller.selectedIds().isEmpty());
+    QCOMPARE(controller.selection()->mode(), HolonightFileBrowser::SelectionSession::Mode::Normal);
+  }
   void folderSelectionAndNavigation() {
     QTemporaryDir temp;
     const auto folder = QFile::encodeName(temp.path());
@@ -985,7 +1026,7 @@ class PortalTests : public QObject {
       }
       QVERIFY(window);
       window->resize(1100, 800);
-      auto* frame = window->findChild<QQuickItem*>("filePreviewFrame");
+      auto* frame = window->findChild<QQuickItem*>("previewImageArea");
       QVERIFY(frame);
       const auto rendered = [&](const QColor& color) {
         const auto image = window->grabWindow();
@@ -1078,7 +1119,7 @@ class PortalTests : public QObject {
       }
       QVERIFY(window);
       window->resize(1100, 800);
-      auto* caption = window->findChild<QQuickItem*>("filePreviewFailureCaption");
+      auto* caption = window->findChild<QQuickItem*>("previewErrorNotice");
       QVERIFY(caption);
       QTRY_VERIFY(caption->isVisible());
       window->resize(800, 400);
@@ -1618,7 +1659,7 @@ class PortalTests : public QObject {
     QTest::keyClick(window, Qt::Key_Down);
     QCOMPARE(controller.cursor(), findRow(controller, "b"));
     controller.setCursor(findRow(controller, "a"));
-    QTest::keyClick(window, Qt::Key_Space);
+    QTest::keyClick(window, Qt::Key_V, Qt::ControlModifier);
     const auto selection = controller.selectedIds();
     QVERIFY(!selection.isEmpty());
     controller.select(findRow(controller, "b"));

@@ -9,7 +9,7 @@
 #include <HolonightFileBrowser/directory_proxy_model.h>
 #include <HolonightFileBrowser/directory_reader.h>
 #include <HolonightFileBrowser/preview/preview_service.h>
-#include <HolonightFileBrowser/selection.h>
+#include <HolonightFileBrowser/selection_session.h>
 #include <holonight/navigation.h>
 
 namespace Portal {
@@ -63,6 +63,7 @@ class Controller : public QObject {
   Q_PROPERTY(QString title READ title CONSTANT)
   Q_PROPERTY(QString acceptLabel READ acceptLabel CONSTANT)
   Q_PROPERTY(int cursor READ cursor WRITE setCursor NOTIFY cursorChanged)
+  Q_PROPERTY(HolonightFileBrowser::SelectionSession* selection READ selection CONSTANT)
   Q_PROPERTY(QStringList selectedIds READ selectedIds NOTIFY selectionChanged)
   Q_PROPERTY(QVariantList places READ places CONSTANT)
   Q_PROPERTY(QStringList filterNames READ filterNames CONSTANT)
@@ -116,6 +117,10 @@ class Controller : public QObject {
   Q_INVOKABLE void parentFolder();
   Q_INVOKABLE void move(int delta);
   Q_INVOKABLE void select(int row);
+  Q_INVOKABLE void pointerSelect(int row, int modifiers = 0);
+  Q_INVOKABLE bool selectionKey(int key, int modifiers, bool repeat);
+  HolonightFileBrowser::SelectionSession* selection() { return &selection_; }
+  void syncSelection();
   Q_INVOKABLE void activate(int row);
   Q_INVOKABLE void toggle(int row);
   Q_INVOKABLE void search(const QString& query);
@@ -154,7 +159,7 @@ class Controller : public QObject {
   int history_index_ = -1;
   QByteArray folder_;
   QByteArray filename_;
-  HolonightFileBrowser::Selection selection_;
+  HolonightFileBrowser::SelectionSession selection_;
   QVariantList places_;
   QString explanation_;
   QString query_;
