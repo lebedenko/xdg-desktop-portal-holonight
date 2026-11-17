@@ -107,8 +107,14 @@ Controller::Controller(Options options, HolonightFileBrowser::ImageRuntimeOption
   connect(reader_, &QAbstractItemModel::rowsInserted, this, [this] { refreshSearch(); });
   connect(reader_, &QAbstractItemModel::modelReset, this, [this] { refreshSearch(); });
   connect(&filter_, &QAbstractItemModel::modelReset, this, [this] { reconcileCursor(); });
-  connect(&filter_, &QAbstractItemModel::rowsRemoved, this, [this] { reconcileCursor(); });
-  connect(&filter_, &QAbstractItemModel::rowsInserted, this, &Controller::reconcileCursor);
+  // Let the view finish structural notifications before cursor changes can create delegates.
+  const auto reconcileRows = [this] {
+    if (!stopped_) {
+      reconcileCursor();
+    }
+  };
+  connect(&filter_, &QAbstractItemModel::rowsRemoved, this, reconcileRows, Qt::QueuedConnection);
+  connect(&filter_, &QAbstractItemModel::rowsInserted, this, reconcileRows, Qt::QueuedConnection);
   connect(&filter_, &QAbstractItemModel::dataChanged, this, [this] {
     ++preview_revision_;
     syncPreview();

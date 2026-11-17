@@ -89,6 +89,24 @@ QQuickItem* findEntry(QQuickItem* parent, const QString& title) {
   }
   return nullptr;
 }
+// Inspect instantiated delegates, including their displayed title and native identity.
+bool renderedRowsMatch(QQuickItem* content, const QStringList& expected, const QByteArray& folder) {
+  int delegates = 0;
+  for (auto* entry : content->childItems()) {
+    if (!entry->property("rowIndex").isValid()) {
+      continue;
+    }
+    ++delegates;
+    const auto row = entry->property("rowIndex").toInt();
+    if (row < 0 || row >= expected.size() || entry->property("index").toInt() != row ||
+        entry->property("title").toString() != expected.at(row) ||
+        entry->property("nativeId").toString() !=
+            QString::fromLatin1(joinPath(folder, expected.at(row).toUtf8()).toHex())) {
+      return false;
+    }
+  }
+  return expected.isEmpty() ? delegates == 0 : delegates > 0;
+}
 class TestSurfaceRole : public QObject {
   Q_OBJECT
  public:
@@ -1355,6 +1373,62 @@ class PortalTests : public QObject {
     controller.navigate(temp.path());
     QTRY_VERIFY(!homeDelegate->property("selected").toBool());
     QVERIFY(!nextDelegate->property("selected").toBool());
+    presenter.close(&controller);
+    QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
+  }
+
+  void qmlFilteredRowsStayConsistent() {
+    QTemporaryDir temp;
+    QVERIFY(QDir(temp.path()).mkdir("files"));
+    const auto folder = QFile::encodeName(temp.filePath("files"));
+    QStringList names;
+    for (int index = 0; index < 100; ++index) {
+      const auto name = QString("%1.%2").arg(index, 3, 10, QLatin1Char('0')).arg(index % 10 == 0 ? "dcm" : "txt");
+      names.append(name);
+      writeFile(joinPath(folder, name.toUtf8()));
+    }
+    const auto options = folderOptions(QFile::encodeName(temp.path()));
+    Controller controller(options);
+    QmlPresenter presenter;
+    QVERIFY(presenter.show(&controller, options));
+    QTRY_VERIFY(!controller.busy());
+    QQuickWindow* window = nullptr;
+    for (auto* candidate : QGuiApplication::topLevelWindows()) {
+      if (candidate->isVisible()) {
+        window = qobject_cast<QQuickWindow*>(candidate);
+      }
+    }
+    QVERIFY(window);
+    auto* listing = window->findChild<QQuickItem*>("listing");
+    auto* search = window->findChild<QQuickItem*>("search");
+    QVERIFY(listing && search);
+    controller.activate(findRow(controller, "files"));
+    QTRY_COMPARE(controller.location(), temp.filePath("files"));
+    QTRY_VERIFY(!controller.busy());
+    QTRY_COMPARE(controller.entries()->rowCount(), names.size());
+    auto* content = qvariant_cast<QQuickItem*>(listing->property("contentItem"));
+    QVERIFY(content);
+    for (const auto& query : {QString("d"), QString("dc"), QString("dcm"), QString(), QString("dcm"),
+                              QString("no-match"), QString("dcm"), QString()}) {
+      QVERIFY(search->setProperty("text", query));
+      QCOMPARE(controller.query(), query);
+      QStringList expected;
+      for (const auto& name : names) {
+        if (name.contains(query)) {
+          expected.append(name);
+        }
+      }
+      QTRY_COMPARE(controller.entries()->rowCount(), expected.size());
+      for (int row = 0; row < expected.size(); ++row) {
+        const auto modelIndex = controller.entries()->index(row, 0);
+        QCOMPARE(modelIndex.data(DirectoryRoles::NameRole).toString(), expected.at(row));
+        QCOMPARE(modelIndex.data(DirectoryRoles::NativePathRole).toByteArray(),
+                 joinPath(folder, expected.at(row).toUtf8()));
+      }
+      QTRY_COMPARE(listing->property("count").toInt(), expected.size());
+      QTRY_VERIFY2(renderedRowsMatch(content, expected, folder),
+                   qPrintable("Rendered rows disagree with filtered model for query: " + query));
+    }
     presenter.close(&controller);
     QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
   }

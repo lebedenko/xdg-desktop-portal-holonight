@@ -26,6 +26,7 @@
     "pointerAndKeyboardSelectionShareMarksAndReconcileRemoval",
     "presentationFailure",
     "qmlBoundedDialog",
+    "qmlFilteredRowsStayConsistent",
     "qmlFolderOpenAndKeyboardRecovery",
     "qmlKeyboardAndFilenameFocus",
     "saveCollisionsLeaveFilesystemUnchanged",
