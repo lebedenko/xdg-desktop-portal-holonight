@@ -393,8 +393,10 @@ class PortalTests : public QObject {
     QVERIFY(QDir(temp.path()).mkdir("sub"));
     auto options = folderOptions(folder);
     options.multiple = true;
-    options.filters = {{.name = "Text", .patterns = {{.kind = 0, .value = "*.txt"}}},
-                       {.name = "Images", .patterns = {{.kind = 1, .value = "image/png"}}}};
+    options.filters = {
+        {.name = "Text", .patterns = {{.kind = 0, .value = "*.txt"}}},
+        {.name = "Images", .patterns = {{.kind = 1, .value = "image/png"}}},
+    };
     Controller controller(options);
     QSignalSpy done(&controller, &Controller::completed);
     QTRY_VERIFY(!controller.busy());
@@ -909,17 +911,24 @@ class PortalTests : public QObject {
     QVERIFY(backend.start());
     auto broker = QDBusConnection::connectToBus(QDBusConnection::SessionBus, "wire-broker");
     const Filters filters{
-        {.name = "Named text filter", .patterns = {{.kind = 0, .value = "*.txt"}, {.kind = 1, .value = "text/plain"}}}};
-    const Choices choices{{.id = "encoding",
-                           .label = "Encoding",
-                           .values = {{.id = "utf8", .label = "UTF-8"}, {.id = "latin", .label = "Latin"}},
-                           .selected = "latin"},
-                          {.id = "boolean", .label = "Flag", .values = {}, .selected = "true"}};
+        {.name = "Named text filter", .patterns = {{.kind = 0, .value = "*.txt"}, {.kind = 1, .value = "text/plain"}}},
+    };
+    const Choices choices{
+        {
+            .id = "encoding",
+            .label = "Encoding",
+            .values = {{.id = "utf8", .label = "UTF-8"}, {.id = "latin", .label = "Latin"}},
+            .selected = "latin",
+        },
+        {.id = "boolean", .label = "Flag", .values = {}, .selected = "true"},
+    };
     auto call = callChooser(broker, "SaveFile", "/test/wire",
-                            {{"filters", QVariant::fromValue(filters)},
-                             {"choices", QVariant::fromValue(choices)},
-                             {"current_folder", QFile::encodeName(temp.path()) + '\0'},
-                             {"current_name", "out.txt"}});
+                            {
+                                {"filters", QVariant::fromValue(filters)},
+                                {"choices", QVariant::fromValue(choices)},
+                                {"current_folder", QFile::encodeName(temp.path()) + '\0'},
+                                {"current_name", "out.txt"},
+                            });
     QTRY_COMPARE(presenter.shown.size(), 1);
     auto* controller = presenter.shown.front();
     QTRY_VERIFY(!controller->busy());
@@ -1243,10 +1252,12 @@ class PortalTests : public QObject {
     auto options = folderOptions(QFile::encodeName(dir.path()));
     options.multiple = true;
     for (int index = 0; index < 30; ++index) {
-      options.choices.append({.id = QString::number(index),
-                              .label = QString("A long caller option label ").repeated(8),
-                              .values = {},
-                              .selected = "false"});
+      options.choices.append({
+          .id = QString::number(index),
+          .label = QString("A long caller option label ").repeated(8),
+          .values = {},
+          .selected = "false",
+      });
     }
     QmlPresenter presenter;
     Controller controller(options);

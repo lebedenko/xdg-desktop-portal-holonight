@@ -59,26 +59,31 @@ struct WaylandParent::Impl {
     // The first barrier finishes registry discovery; the second validates the import
     // before show() can create and commit the chooser shell role.
     sync = wl_display_sync(wrapper);
-    static constexpr wl_callback_listener listener{.done = [](void* data, wl_callback* callback, uint32_t) {
-      auto* self = static_cast<Impl*>(data);
-      wl_callback_destroy(callback);
-      self->sync = nullptr;
-      if (self->import_requested || self->importer == nullptr) {
-        self->owner->complete(self->imported != nullptr);
-        return;
-      }
-      self->import_requested = true;
-      self->imported = zxdg_importer_v2_import_toplevel(self->importer, self->handle.constData());
-      static constexpr zxdg_imported_v2_listener imported_listener{
-          .destroyed = [](void* imported_data, zxdg_imported_v2* imported) {
-            auto* state = static_cast<Impl*>(imported_data);
-            state->destroyed = true;
-            zxdg_imported_v2_destroy(imported);
-            state->imported = nullptr;
-          }};
-      zxdg_imported_v2_add_listener(self->imported, &imported_listener, self);
-      self->synchronize();
-    }};
+    static constexpr wl_callback_listener listener{
+        .done =
+            [](void* data, wl_callback* callback, uint32_t) {
+              auto* self = static_cast<Impl*>(data);
+              wl_callback_destroy(callback);
+              self->sync = nullptr;
+              if (self->import_requested || self->importer == nullptr) {
+                self->owner->complete(self->imported != nullptr);
+                return;
+              }
+              self->import_requested = true;
+              self->imported = zxdg_importer_v2_import_toplevel(self->importer, self->handle.constData());
+              static constexpr zxdg_imported_v2_listener imported_listener{
+                  .destroyed =
+                      [](void* imported_data, zxdg_imported_v2* imported) {
+                        auto* state = static_cast<Impl*>(imported_data);
+                        state->destroyed = true;
+                        zxdg_imported_v2_destroy(imported);
+                        state->imported = nullptr;
+                      },
+              };
+              zxdg_imported_v2_add_listener(self->imported, &imported_listener, self);
+              self->synchronize();
+            },
+    };
     wl_callback_add_listener(sync, &listener, this);
     wl_display_flush(display);
   }
@@ -161,7 +166,8 @@ void WaylandParent::prepareNative() {
                   static_cast<zxdg_importer_v2*>(wl_registry_bind(registry, name, &zxdg_importer_v2_interface, 1));
             }
           },
-      .global_remove = [](void*, wl_registry*, uint32_t) {}};
+      .global_remove = [](void*, wl_registry*, uint32_t) {},
+  };
   wl_registry_add_listener(state.registry, &listener, &state);
   // Qt owns reading the shared display. Dispatch only already-read private-queue events
   // from the event loop; never roundtrip or run another interaction loop.

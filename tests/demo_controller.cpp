@@ -9,8 +9,9 @@
 #include <limits>
 
 namespace {
-const QStringList Labels{"Open file", "Open multiple files", "Select folder", "Select multiple folders",
-                         "Save file", "Save multiple files"};
+const QStringList Labels{
+    "Open file", "Open multiple files", "Select folder", "Select multiple folders", "Save file", "Save multiple files",
+};
 }
 DemoController::DemoController(QDBusConnection connection, QObject* parent)
     : QObject(parent), connection_(std::move(connection)) {

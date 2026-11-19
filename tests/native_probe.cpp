@@ -89,16 +89,23 @@ struct Probe {
     } else if (mode == "many") {
       method = "SaveFiles";
     }
-    QVariantMap options{{"current_folder", QFile::encodeName(folder) + '\0'},
-                        {"modal", modal},
-                        {"multiple", mode == "multi"},
-                        {"directory", mode == "directory"},
-                        {"current_name", "portal-test.txt"},
-                        {"files", QVariant::fromValue(Portal::Names{"portal-test.txt", "portal-test.txt"})}};
+    QVariantMap options{
+        {"current_folder", QFile::encodeName(folder) + '\0'},
+        {"modal", modal},
+        {"multiple", mode == "multi"},
+        {"directory", mode == "directory"},
+        {"current_name", "portal-test.txt"},
+        {"files", QVariant::fromValue(Portal::Names{"portal-test.txt", "portal-test.txt"})},
+    };
     auto message = QDBusMessage::createMethodCall(Portal::BusName, Portal::DesktopPath,
                                                   "org.freedesktop.impl.portal.FileChooser", method);
-    message.setArguments({QVariant::fromValue(QDBusObjectPath("/test/native")), "native.probe", handle,
-                          "Manual HoloNight chooser", options});
+    message.setArguments({
+        QVariant::fromValue(QDBusObjectPath("/test/native")),
+        "native.probe",
+        handle,
+        "Manual HoloNight chooser",
+        options,
+    });
     auto* watcher = new QDBusPendingCallWatcher(broker.asyncCall(message, std::numeric_limits<int>::max()), &parent);
     QObject::connect(watcher, &QDBusPendingCallWatcher::finished, &parent, [watcher] {
       QDBusPendingReply<uint, QVariantMap> reply(*watcher);
@@ -184,20 +191,24 @@ struct Probe {
                     static_cast<zxdg_exporter_v2*>(wl_registry_bind(registry, name, &zxdg_exporter_v2_interface, 1));
               }
             },
-        .global_remove = [](void*, wl_registry*, uint32_t) {}};
+        .global_remove = [](void*, wl_registry*, uint32_t) {},
+    };
     wl_registry_add_listener(registry, &listener, this);
     registry_sync = wl_display_sync(wrapper);
-    static constexpr wl_callback_listener syncListener{.done = [](void* data, wl_callback* callback, uint32_t) {
-      auto* self = static_cast<Probe*>(data);
-      wl_callback_destroy(callback);
-      self->registry_sync = nullptr;
-      if (self->exporter == nullptr) {
-        qInfo() << "xdg-foreign export is unavailable; opening an ordinary chooser.";
-        if (self->mode != "--demo") {
-          self->request({});
-        }
-      }
-    }};
+    static constexpr wl_callback_listener syncListener{
+        .done =
+            [](void* data, wl_callback* callback, uint32_t) {
+              auto* self = static_cast<Probe*>(data);
+              wl_callback_destroy(callback);
+              self->registry_sync = nullptr;
+              if (self->exporter == nullptr) {
+                qInfo() << "xdg-foreign export is unavailable; opening an ordinary chooser.";
+                if (self->mode != "--demo") {
+                  self->request({});
+                }
+              }
+            },
+    };
     wl_callback_add_listener(registry_sync, &syncListener, this);
     QObject::connect(&dispatch, &QTimer::timeout, &parent, [this] {
       wl_display_dispatch_queue_pending(display, queue);
@@ -210,11 +221,13 @@ struct Probe {
       }
       exported = zxdg_exporter_v2_export_toplevel(exporter, nativeWindow->surface());
       static constexpr zxdg_exported_v2_listener handleListener{
-          .handle = [](void* data, zxdg_exported_v2*, const char* handle) {
-            auto* self = static_cast<Probe*>(data);
-            qInfo() << "Exported native parent. Verify compositor parenting and modality manually.";
-            self->request("wayland:" + QString::fromUtf8(handle));
-          }};
+          .handle =
+              [](void* data, zxdg_exported_v2*, const char* handle) {
+                auto* self = static_cast<Probe*>(data);
+                qInfo() << "Exported native parent. Verify compositor parenting and modality manually.";
+                self->request("wayland:" + QString::fromUtf8(handle));
+              },
+      };
       zxdg_exported_v2_add_listener(exported, &handleListener, this);
       wl_display_flush(display);
     });
