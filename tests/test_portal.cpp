@@ -1419,8 +1419,16 @@ class PortalTests : public QObject {
     QTRY_COMPARE(controller.entries()->rowCount(), names.size());
     auto* content = qvariant_cast<QQuickItem*>(listing->property("contentItem"));
     QVERIFY(content);
-    for (const auto& query : {QString("d"), QString("dc"), QString("dcm"), QString(), QString("dcm"),
-                              QString("no-match"), QString("dcm"), QString()}) {
+    for (const auto& query : {
+             QString("d"),
+             QString("dc"),
+             QString("dcm"),
+             QString(),
+             QString("dcm"),
+             QString("no-match"),
+             QString("dcm"),
+             QString(),
+         }) {
       QVERIFY(search->setProperty("text", query));
       QCOMPARE(controller.query(), query);
       QStringList expected;
