@@ -1,6 +1,9 @@
 #pragma once
 #include "controller.h"
 #include "settings.h"
+#ifdef HOLONIGHT_PORTAL_SCREENSHOT
+#include "screenshot.h"
+#endif
 
 #include <QDBusConnection>
 #include <QDBusMessage>
@@ -68,6 +71,9 @@ class Backend : public QDBusVirtualObject {
   QHash<QString, Request*> requests_;
   Holonight::AppearanceReader appearance_;
   SettingsPortalBackend settings_;
+#ifdef HOLONIGHT_PORTAL_SCREENSHOT
+  ScreenshotPortal screenshot_;
+#endif
   bool object_registered_ = false;
   bool service_registered_ = false;
   bool stopping_ = false;

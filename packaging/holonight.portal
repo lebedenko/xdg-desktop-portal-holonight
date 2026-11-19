@@ -1,4 +1,4 @@
 [portal]
 DBusName=org.freedesktop.impl.portal.desktop.holonight
-Interfaces=org.freedesktop.impl.portal.FileChooser;org.freedesktop.impl.portal.Settings;
+Interfaces=org.freedesktop.impl.portal.FileChooser;org.freedesktop.impl.portal.Settings;@SCREENSHOT_INTERFACE@
 UseIn=HoloNight;Hyprland;sway;labwc;

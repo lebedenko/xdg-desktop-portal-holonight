@@ -11,6 +11,7 @@ import tempfile
 def main():
     build = Path(sys.argv[1]).resolve()
     tests = Path(sys.argv[2]).resolve()
+    screenshot_enabled = len(sys.argv) > 3 and sys.argv[3] == "ON"
     with tempfile.TemporaryDirectory(prefix="portal-install-") as directory:
         stage = Path(directory)
         env = os.environ.copy()
@@ -24,7 +25,10 @@ def main():
         command = next(line.removeprefix("Exec=") for line in service.read_text().splitlines() if line.startswith("Exec="))
         executable = stage / shlex.split(command)[0].lstrip("/")
         assert executable.is_file(), "missing backend executable"
-        assert "Interfaces=org.freedesktop.impl.portal.FileChooser;org.freedesktop.impl.portal.Settings;" in descriptor.read_text()
+        interfaces = "Interfaces=org.freedesktop.impl.portal.FileChooser;org.freedesktop.impl.portal.Settings;"
+        if screenshot_enabled:
+            interfaces += "org.freedesktop.impl.portal.Screenshot;"
+        assert interfaces in descriptor.read_text().splitlines()
         assert "Name=org.freedesktop.impl.portal.desktop.holonight" in service.read_text()
         # Only the test fixture rewrites /usr to its staged path; installed payload stays relocatable by DESTDIR.
         lines = service.read_text().splitlines()

@@ -92,6 +92,9 @@ bool Backend::start() {
 }
 void Backend::shutdown() {
   stopping_ = true;
+#ifdef HOLONIGHT_PORTAL_SCREENSHOT
+  screenshot_.shutdown();
+#endif
   const auto requests = requests_.values();
   for (auto* request : requests) {
     request->complete(2, {});
@@ -119,14 +122,23 @@ QString Backend::introspect(const QString& /*path*/) const {
             "</method>")
             .arg(method);
   }
-  return xml + R"(</interface><interface name="org.freedesktop.impl.portal.Settings">
+  xml += R"(</interface><interface name="org.freedesktop.impl.portal.Settings">
     <method name="Read"><arg type="s" direction="in"/><arg type="s" direction="in"/>
     <arg type="v" direction="out"/></method>
     <method name="ReadAll"><arg type="as" direction="in"/><arg type="a{sa{sv}}" direction="out"/></method>
     <signal name="SettingChanged"><arg type="s"/><arg type="s"/><arg type="v"/></signal>
     </interface>)";
+#ifdef HOLONIGHT_PORTAL_SCREENSHOT
+  xml += ScreenshotPortal::introspection();
+#endif
+  return xml;
 }
 bool Backend::handleMessage(const QDBusMessage& message, const QDBusConnection& connection) {
+#ifdef HOLONIGHT_PORTAL_SCREENSHOT
+  if (screenshot_.handleMessage(message, connection, stopping_)) {
+    return true;
+  }
+#endif
   if (message.interface() == "org.freedesktop.impl.portal.Settings") {
     return settings_.handleMessage(message, connection);
   }

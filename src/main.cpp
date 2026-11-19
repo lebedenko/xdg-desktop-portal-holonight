@@ -25,7 +25,14 @@ void terminate(int /*signal*/) {
 }
 }  // namespace
 int main(int argc, char** argv) {
+#ifdef HOLONIGHT_PORTAL_SCREENSHOT
+  qputenv("QT_WAYLAND_USE_BYPASSWINDOWMANAGERHINT", "1");
+  // The layer-shell singleton releases its Wayland proxies during static destruction.
+  static int appArgc = argc;
+  static QGuiApplication app(appArgc, argv);
+#else
   QGuiApplication app(argc, argv);
+#endif
   QCoreApplication::setApplicationName("xdg-desktop-portal-holonight");
   QCoreApplication::setApplicationVersion("0.1.0");
   QGuiApplication::setQuitOnLastWindowClosed(false);

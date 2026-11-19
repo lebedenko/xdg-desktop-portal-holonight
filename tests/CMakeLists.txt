@@ -13,7 +13,7 @@ set_tests_properties(portal-tests PROPERTIES TIMEOUT 60 ENVIRONMENT
   "QT_QPA_PLATFORM=offscreen;QT_QUICK_BACKEND=software;QML_IMPORT_PATH=${runtime_qml}")
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
 add_test(NAME portal-staged-activation COMMAND ${Python3_EXECUTABLE} ${PROJECT_SOURCE_DIR}/scripts/check-install.py
-  ${PROJECT_BINARY_DIR} $<TARGET_FILE:portal-tests>)
+  ${PROJECT_BINARY_DIR} $<TARGET_FILE:portal-tests> ${HOLONIGHT_PORTAL_SCREENSHOT})
 set_tests_properties(portal-staged-activation PROPERTIES TIMEOUT 30 ENVIRONMENT
   "QT_QPA_PLATFORM=offscreen;QT_QUICK_BACKEND=software;QML_IMPORT_PATH=${runtime_qml};LD_LIBRARY_PATH=$<TARGET_FILE_DIR:HolonightFileBrowser::Quick>")
 qt_add_executable(portal-native-probe native_probe.cpp demo_controller.cpp demo_controller.h)
@@ -52,3 +52,12 @@ add_dependencies(all_qmllint portal-demo-qmllint)
 
 add_test(NAME consumer-test-lane COMMAND ${Python3_EXECUTABLE}
   "${PROJECT_SOURCE_DIR}/scripts/check-test-lane.py")
+
+if(HOLONIGHT_PORTAL_SCREENSHOT)
+  add_executable(portal-screenshot-tests test_screenshot.cpp)
+  target_link_libraries(portal-screenshot-tests PRIVATE portal-core Qt6::Test)
+  target_compile_options(portal-screenshot-tests PRIVATE -Wall -Wextra -Wpedantic)
+  add_test(NAME portal-screenshot-tests COMMAND ${DBUS_RUN_SESSION}
+    --config-file=${CMAKE_CURRENT_SOURCE_DIR}/dbus-session.conf -- $<TARGET_FILE:portal-screenshot-tests>)
+  set_tests_properties(portal-screenshot-tests PROPERTIES TIMEOUT 30)
+endif()
